@@ -1,0 +1,1117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Chatline">
+<meta name="theme-color" content="#0e0d12">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="icon" href="icon.png">
+<link rel="manifest" href="manifest.webmanifest">
+<title>Chatline Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&family=Barlow+Condensed:wght@600;700&display=swap">
+<style>
+/* Layout: phone-first stream screen. "Twitch" layout = video on top, streamer strip, chat below.
+   "Full-screen camera" layout = camera fills the screen, strip and chat float over it. Dark only, like a stream player. */
+:root{
+  --bg:#0e0d12;
+  --panel:#17161d;
+  --raise:#221f2b;
+  --line:#2d2a37;
+  --fg:#efedf5;
+  --muted:#a19db0;
+  --accent:#a873ff;
+  --accent-ink:#ffffff;
+  --live:#e8273b;
+  --ok:#22a861;
+  --scrim:rgba(8,7,12,.62);
+  --glass:rgba(20,18,28,.62);
+  --ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --num:"Barlow Condensed","Figtree",system-ui,sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--fg);font:14px/1.4 var(--ui);overflow:hidden;-webkit-text-size-adjust:100%;touch-action:manipulation;-webkit-tap-highlight-color:transparent;overscroll-behavior:none}
+button{font:inherit;color:inherit;cursor:pointer;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.app{position:fixed;inset:0;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top,0px);padding-left:env(safe-area-inset-left,0px);padding-right:env(safe-area-inset-right,0px)}
+.watch{display:flex;flex-direction:column;flex:none}
+
+/* ---- video stage ---- */
+.stage{position:relative;width:100%;max-width:100%;aspect-ratio:16/9;background:#000;overflow:hidden}
+.scene{position:absolute;inset:-20%;background:
+  radial-gradient(40% 50% at 25% 35%,rgba(168,115,255,.55),transparent 70%),
+  radial-gradient(35% 45% at 75% 65%,rgba(255,92,138,.35),transparent 70%),
+  radial-gradient(50% 60% at 60% 20%,rgba(60,170,255,.25),transparent 70%),
+  #120f1c;animation:drift 22s ease-in-out infinite alternate}
+@keyframes drift{to{transform:translate(6%,-4%) rotate(4deg) scale(1.08)}}
+.stage video,.stage img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.mirror{transform:scaleX(-1)}
+.stage-msg{position:absolute;inset:0;display:grid;place-content:center;justify-items:center;gap:10px;text-align:center;padding:16px;color:rgba(255,255,255,.8);font-size:13px}
+.badges{position:absolute;left:10px;top:10px;display:flex;gap:6px;align-items:center}
+.pill{font-family:var(--num);font-weight:700;font-size:14px;letter-spacing:.05em;line-height:1;padding:4px 7px 3px;border-radius:4px;background:var(--scrim);color:#fff;display:inline-flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;border:0}
+.pill.live{background:var(--live)}
+.pill svg{width:12px;height:12px}
+.flip{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:50%;border:0;background:var(--scrim);display:grid;place-items:center}
+.flip svg{width:18px;height:18px}
+.offline-card{position:absolute;inset:0;display:grid;place-content:center;gap:10px;text-align:center;background:rgba(8,7,12,.78)}
+.offline-card b{font-family:var(--num);font-size:28px;letter-spacing:.08em}
+.offline-card span{color:var(--muted)}
+
+/* ---- streamer strip ---- */
+.strip{display:flex;gap:12px;align-items:flex-start;padding:12px 16px;background:var(--panel);border-bottom:1px solid var(--line)}
+.avatar{flex:none;width:42px;height:42px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:17px;background:var(--accent);color:var(--accent-ink)}
+.avatar.is-live{box-shadow:0 0 0 2px var(--panel),0 0 0 4px var(--live)}
+.who{min-width:0;flex:1;display:grid;gap:2px}
+.who .name{font-weight:700;font-size:15px;display:flex;gap:8px;align-items:center}
+.livepill{display:none}
+.who .title{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.who .cat{color:var(--accent);font-weight:600;font-size:13px}
+.tags{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+.tag{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:var(--raise);color:var(--muted)}
+.stats{flex:none;display:grid;justify-items:end;gap:4px;font-variant-numeric:tabular-nums}
+.stat{display:flex;gap:5px;align-items:center;font-family:var(--num);font-weight:600;font-size:16px;letter-spacing:.02em;background:none;border:0;padding:0}
+.stat.viewers{color:#ff6a78}
+.stat.viewers svg{width:14px;height:14px}
+.stat.time{color:var(--muted)}
+.iconbtn{width:34px;height:34px;border-radius:6px;border:0;background:var(--raise);display:grid;place-items:center}
+.iconbtn svg{width:18px;height:18px}
+
+/* ---- chat ---- */
+.chat{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--panel)}
+.chat-head{display:flex;justify-content:space-between;gap:12px;align-items:center;padding:8px 16px;border-bottom:1px solid var(--line);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.chat-head #modeLbl{color:var(--accent);letter-spacing:.04em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.listwrap{position:relative;flex:1;min-height:0;display:flex;flex-direction:column}
+.list{flex:1;min-height:0;overflow-y:auto;padding:8px 16px 10px;display:flex;flex-direction:column;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
+.list>:first-child{margin-top:auto}
+.msg{padding:4px 6px;margin:0 -6px;border-radius:4px;line-height:1.45;overflow-wrap:anywhere;flex:none}
+.msg .b{display:inline-block;width:16px;height:16px;vertical-align:-3px;margin-right:3px;border-radius:3px}
+.msg .u{font-weight:700}
+.msg.self{background:rgba(168,115,255,.10)}
+.msg.event{margin:6px -6px;padding:8px 10px;border-left:3px solid var(--accent);background:var(--raise);border-radius:0 6px 6px 0}
+.msg.event .lead{font-weight:700}
+.msg.event .sub{display:block;color:var(--muted);font-size:13px;margin-top:2px}
+.msg.event.raid{border-left-color:#ffb547}
+.msg.event.gift{border-left-color:#ff5fa8}
+.msg.system{color:var(--muted);font-size:13px;font-style:italic}
+.paused{position:absolute;left:50%;transform:translateX(-50%);bottom:8px;border:0;border-radius:6px;padding:7px 14px;background:var(--scrim);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-weight:600;font-size:13px;display:flex;gap:6px;align-items:center;white-space:nowrap}
+
+/* ---- dock: prefab buttons + chat box ---- */
+.dock{display:grid;gap:8px;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
+.prefabs{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+.pf{position:relative;overflow:hidden;height:38px;border:0;border-radius:6px;background:var(--raise);font-family:var(--num);font-weight:700;font-size:19px;display:grid;place-items:center;padding:0}
+.pf.on{background:var(--accent);color:var(--accent-ink)}
+.pf .bar,.climb .bar{position:absolute;left:0;bottom:0;height:3px;width:0;background:currentColor}
+.pf svg{width:18px;height:18px}
+.compose{display:flex;gap:8px}
+.compose input{flex:1;min-width:0;font:inherit;font-size:16px;color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:9px 12px}
+.compose input:focus{border-color:var(--accent);outline:none}
+.climb{flex:none;width:42px;position:relative;overflow:hidden;border:0;border-radius:6px;background:var(--raise);display:grid;place-items:center}
+.climb svg{width:20px;height:20px}
+.climb.on{background:var(--ok);color:#fff}
+.btn{border:0;border-radius:6px;padding:9px 14px;font-weight:700;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--raise);color:var(--fg)}
+.btn.danger{background:var(--live);color:#fff}
+
+.clean .ctl{display:none!important}
+
+/* ---- full-screen camera layout ---- */
+.app.irl{padding-top:0}
+.irl .stage{position:fixed;inset:0;aspect-ratio:auto;z-index:0}
+.irl .badges{display:none}
+.irl .watch{position:relative;z-index:2}
+.irl .strip{position:relative;z-index:1;background:linear-gradient(rgba(0,0,0,.65),rgba(0,0,0,0));border:0;padding-top:calc(12px + env(safe-area-inset-top,0px));padding-bottom:30px}
+.irl .livepill{display:inline-flex}
+.irl .strip .name,.irl .strip .title,.irl .strip .cat,.irl .stat{text-shadow:0 1px 3px rgba(0,0,0,.85)}
+.irl .tag{background:var(--glass);color:#fff}
+.irl .iconbtn{background:var(--glass)}
+.irl .avatar.is-live{box-shadow:0 0 0 2px #000,0 0 0 4px var(--live)}
+.irl .flip{top:calc(env(safe-area-inset-top,0px) + 96px);bottom:auto}
+.irl .chat{position:relative;z-index:2;flex:none;height:52%;margin-top:auto;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.5) 40%)}
+.irl .chat-head{display:none}
+.irl .list{-webkit-mask-image:linear-gradient(transparent,#000 20%);mask-image:linear-gradient(transparent,#000 20%)}
+.irl .msg{font-weight:600;font-size:15px;text-shadow:0 1px 2px rgba(0,0,0,.95),0 0 6px rgba(0,0,0,.6)}
+.irl .msg.system{color:#ddd}
+.irl .msg.self{background:rgba(168,115,255,.22)}
+.irl .msg.event{background:var(--glass);text-shadow:none}
+.irl .dock{border-top:0}
+.irl .pf:not(.on),.irl .climb:not(.on),.irl .compose input{background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.irl .compose input{border-color:rgba(255,255,255,.14)}
+
+/* wide screens / landscape (Twitch layout): video left, chat right */
+@media (min-width:820px), (orientation:landscape) and (min-width:600px){
+  .app:not(.irl){flex-direction:row}
+  .app:not(.irl) .watch{flex:1;min-width:0;overflow-y:auto}
+  .app:not(.irl) .chat{flex:none;width:340px;border-left:1px solid var(--line)}
+}
+
+/* ---- sheets ---- */
+.sheet-wrap{position:fixed;inset:0;z-index:10;background:rgba(0,0,0,.55);display:flex;align-items:flex-end;justify-content:center}
+.sheet{width:100%;max-width:560px;max-height:calc(100% - env(safe-area-inset-top,0px) - 12px);overflow-y:auto;-webkit-overflow-scrolling:touch;background:var(--panel);border-radius:14px 14px 0 0;padding:18px 16px 0;display:grid;gap:14px;align-content:start}
+.sheet h2{margin:0;font-size:18px}
+.sheet h3{margin:6px 0 0;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.field{display:grid;gap:6px}
+.field label,.field .lbl{font-weight:600;font-size:13px}
+.field small,.sheet .note{color:var(--muted);font-size:12px}
+.field input[type=text],.field input[type=number],.field textarea{font:inherit;font-size:16px;color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:6px;padding:8px 10px;width:100%}
+.field textarea{min-height:140px;resize:vertical;line-height:1.4}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.inline{display:flex;gap:8px}
+.inline input{flex:1;min-width:0}
+.check{display:flex;gap:10px;align-items:center;font-weight:600;font-size:13px}
+.check input{width:20px;height:20px;accent-color:var(--accent)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.chips{display:flex;gap:6px;flex-wrap:wrap}
+.chip{position:relative}
+.chip input{position:absolute;opacity:0;pointer-events:none}
+.chip span,.chipbtn{display:block;padding:7px 12px;border-radius:999px;background:var(--raise);font-weight:600;font-size:13px;border:0}
+.chip input:checked+span{background:var(--accent);color:var(--accent-ink)}
+.chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
+.tabs{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.tabs button{height:38px;border:0;border-radius:6px;background:var(--raise);font-family:var(--num);font-weight:700;font-size:18px}
+.tabs button.on{background:var(--accent);color:var(--accent-ink)}
+.bignum{display:grid;gap:2px;padding:12px 14px;background:var(--raise);border-radius:8px}
+.bignum b{font-family:var(--num);font-size:40px;line-height:1;color:#ff6a78;font-variant-numeric:tabular-nums}
+.bignum small{color:var(--muted)}
+.sheet-actions{display:flex;gap:8px;flex-wrap:wrap;position:sticky;bottom:0;background:var(--panel);padding:10px 0 calc(14px + env(safe-area-inset-bottom,0px))}
+.sheet-actions .btn{flex:1}
+.filebtn{position:relative;display:inline-flex;align-items:center;justify-content:center;padding:9px 14px;border-radius:6px;background:var(--raise);font-weight:600;cursor:pointer}
+.filebtn input{position:absolute;opacity:0;width:1px;height:1px}
+
+.toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:20;background:var(--scrim);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+@media (prefers-reduced-motion:reduce){.scene{animation:none}}
+</style>
+</head>
+<body>
+
+<div class="app" id="app">
+  <div class="watch">
+    <div class="stage" id="stage">
+      <div class="scene" id="scene"></div>
+      <video id="cam" playsinline autoplay muted hidden></video>
+      <div id="media" hidden></div>
+      <div class="stage-msg" id="stageMsg" hidden><span id="stageMsgText"></span><button class="btn" id="camRetry" hidden>Start camera</button></div>
+      <div class="badges">
+        <span class="pill live">LIVE</span>
+        <button class="pill" data-open-viewers aria-label="Viewer controls"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5z"/></svg><span id="vPill">0</span></button>
+      </div>
+      <button class="flip ctl" id="flip" aria-label="Switch camera" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M9 13a3 3 0 0 1 5-2.2M15 13a3 3 0 0 1-5 2.2"/><path d="M14 9v2h-2M10 17v-2h2"/></svg></button>
+      <div class="offline-card" id="offline" hidden>
+        <b>OFFLINE</b>
+        <span>The stream has ended.</span>
+        <div><button class="btn" id="goLive2">Go live</button></div>
+      </div>
+    </div>
+
+    <div class="strip">
+      <div class="avatar is-live" id="avatar">N</div>
+      <div class="who">
+        <div class="name"><span id="sName">nightowl</span><span class="pill live livepill" id="livePill2">LIVE</span></div>
+        <div class="title" id="sTitle"></div>
+        <div class="cat" id="sCat"></div>
+        <div class="tags" id="sTags"></div>
+      </div>
+      <div class="stats">
+        <button class="stat viewers" id="vStat" data-open-viewers aria-label="Viewer controls"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5z"/></svg><span id="vCount">0</span></button>
+        <div class="stat time" id="uptime">0:00:00</div>
+        <button class="iconbtn ctl" id="openSettings" aria-label="Stream settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg></button>
+      </div>
+    </div>
+  </div>
+
+  <section class="chat" aria-label="Stream chat">
+    <div class="chat-head"><span>Stream chat</span><span id="modeLbl"></span></div>
+    <div class="listwrap">
+      <div class="list" id="list"></div>
+      <button class="paused" id="paused" hidden>Chat paused due to scroll <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12 2 6h12z"/></svg></button>
+    </div>
+    <div class="dock">
+      <div class="prefabs ctl" id="prefabs"></div>
+      <form class="compose" id="compose">
+        <input id="say" type="text" placeholder="Send a message" autocomplete="off" autocorrect="off" enterkeyhint="send" maxlength="300">
+        <button class="climb ctl" type="button" id="climb" aria-label="Start viewer climb (hold for viewer controls)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><i class="bar" id="climbBar"></i></button>
+        <button class="btn" type="submit">Chat</button>
+      </form>
+    </div>
+  </section>
+</div>
+
+<!-- Stream settings -->
+<div class="sheet-wrap" id="settingsWrap" hidden>
+  <form class="sheet" id="settings">
+    <h2>Stream settings</h2>
+    <div class="chips">
+      <button type="button" class="chipbtn" id="toPrefabs">Edit prefabs</button>
+      <button type="button" class="chipbtn" id="toViewers">Viewers</button>
+    </div>
+
+    <h3>Stream</h3>
+    <div class="field"><label for="fStreamer">Channel name</label><input id="fStreamer" type="text" maxlength="25" autocapitalize="off"></div>
+    <div class="field"><label for="fTitle">Stream title</label><input id="fTitle" type="text" maxlength="140"></div>
+    <div class="row2">
+      <div class="field"><label for="fCat">Category</label><input id="fCat" type="text" maxlength="40"></div>
+      <div class="field"><label for="fTags">Tags</label><input id="fTags" type="text" placeholder="English, IRL"></div>
+    </div>
+    <div class="field"><label for="fUptime">Uptime (h:mm)</label><input id="fUptime" type="text" inputmode="decimal" placeholder="1:15"><small>Change this to look like you've been live longer.</small></div>
+    <label class="check"><input id="fEvents" type="checkbox"> Random follows, subs, gifted subs and raids</label>
+
+    <h3>Screen</h3>
+    <div class="field">
+      <span class="lbl">Layout</span>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="fLayout" value="twitch"><span>Video on top</span></label>
+        <label class="chip"><input type="radio" name="fLayout" value="irl"><span>Full-screen camera</span></label>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Stream picture</span>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="fSource" value="back"><span>Back camera</span></label>
+        <label class="chip"><input type="radio" name="fSource" value="front"><span>Front camera</span></label>
+        <label class="chip"><input type="radio" name="fSource" value="media"><span>Photo or video</span></label>
+        <label class="chip"><input type="radio" name="fSource" value="scene"><span>Background</span></label>
+      </div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <label class="filebtn">Choose photo or video<input id="fMedia" type="file" accept="image/*,video/*"></label>
+      </div>
+      <small>A picked photo or video stays until you close the app.</small>
+    </div>
+
+    <h3>Chat</h3>
+    <div class="field"><label for="fReacts">Replies when you chat</label><textarea id="fReacts" style="min-height:100px"></textarea><small>Viewers pick from these right after you send a message. One per line.</small></div>
+    <div class="field"><label for="fNames">Chatter names</label><textarea id="fNames"></textarea><small>One per line.</small></div>
+    <p class="note">Double-tap the video to hide or show the buttons. Hold a number button to edit that prefab.</p>
+
+    <div class="sheet-actions">
+      <button type="button" class="btn danger" id="toggleLive">End stream</button>
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Prefab editor -->
+<div class="sheet-wrap" id="prefabWrap" hidden>
+  <form class="sheet" id="prefabForm">
+    <h2>Prefabs</h2>
+    <div class="tabs" id="pTabs"></div>
+    <div class="field"><label for="pName">Name</label><input id="pName" type="text" maxlength="30"></div>
+    <p class="note" id="pNote"></p>
+    <div class="field"><label for="pMain" id="pMainLbl">Main messages</label><textarea id="pMain"></textarea><small>One per line. Repeat a line to make it show up more. You can use {streamer}, {game}, {viewers} and {user}.</small></div>
+    <div class="field" id="pAltField"><label for="pAlt">Mixed-in messages</label><textarea id="pAlt" style="min-height:90px"></textarea></div>
+    <div class="field" id="pPctField"><label for="pPct" id="pPctLbl"></label><input id="pPct" type="range" min="0" max="100" step="5"></div>
+    <div class="field"><label for="pRate" id="pRateLbl"></label><input id="pRate" type="range" min="2" max="400" step="1"></div>
+    <div class="field" id="pDurField"><label for="pDur">Runs for (seconds)</label><input id="pDur" type="number" inputmode="numeric" min="1" max="3600"><small>Then chat goes back to 7 (normal chat).</small></div>
+    <button type="button" class="btn ghost" id="pReset">Reset this prefab</button>
+    <div class="sheet-actions">
+      <button type="button" class="btn ghost" data-close>Cancel</button>
+      <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Viewer controls -->
+<div class="sheet-wrap" id="viewerWrap" hidden>
+  <form class="sheet" id="viewerForm">
+    <h2>Viewers</h2>
+    <div class="bignum"><b id="vBig">0</b><small id="vState"></small></div>
+    <div class="field">
+      <label for="vNow">Set viewers now</label>
+      <div class="inline"><input id="vNow" type="number" inputmode="numeric" min="0" max="9999999" placeholder="3000"><button type="button" class="btn ghost" id="vSetNow">Set</button></div>
+      <small>Jumps straight to this number and fluctuates around it.</small>
+    </div>
+    <div class="field">
+      <label for="vTo">Climb to</label>
+      <input id="vTo" type="number" inputmode="numeric" min="0" max="9999999">
+      <div class="chips" id="vQuick"></div>
+    </div>
+    <div class="field">
+      <span class="lbl">Climb time</span>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="vTime" value="30"><span>30s</span></label>
+        <label class="chip"><input type="radio" name="vTime" value="60"><span>1 min</span></label>
+        <label class="chip"><input type="radio" name="vTime" value="120"><span>2 min</span></label>
+        <label class="chip"><input type="radio" name="vTime" value="300"><span>5 min</span></label>
+        <label class="chip"><input type="radio" name="vTime" value="600"><span>10 min</span></label>
+      </div>
+    </div>
+    <div class="field">
+      <span class="lbl">Fluctuation</span>
+      <div class="chips">
+        <label class="chip"><input type="radio" name="vWob" value="low"><span>Low</span></label>
+        <label class="chip"><input type="radio" name="vWob" value="med"><span>Medium</span></label>
+        <label class="chip"><input type="radio" name="vWob" value="high"><span>High</span></label>
+      </div>
+    </div>
+    <p class="note">The arrow button next to the chat box starts this climb any time. Tap the viewer count to open this panel.</p>
+    <div class="sheet-actions">
+      <button type="button" class="btn ghost" data-close>Close</button>
+      <button type="submit" class="btn">Start climb</button>
+    </div>
+  </form>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* ================= defaults ================= */
+const NAMES = `pixelpanda
+sleepyfrog_
+xKiraXx
+toastboi
+mango_mae
+grumbleweed
+luna_tics
+captain_crumb
+noodlehead42
+fizzywizz
+ghostpepper_
+bigsnacc
+wren_writes
+dootdoot
+bluecheese_ttv
+moth_lamp
+zeph
+coffeegoblin
+okayyyy_
+saltydog91
+juniper_j
+lowbatt
+quietcat
+hexagon_hal
+bean_counter
+starfruit
+mossymarcus
+yeehaw_yuki
+tofu_tim
+crumbsnatcher
+neonnacho
+sk8rbo1
+drowsy_dan
+peachfuzz
+lil_lantern
+oatmilk_ollie
+banditbird
+wobble_wes
+cloudberry
+v8_vinny`;
+
+const REACTS = `LOL
+W
+real
+😂😂😂
+facts
+true true
+{streamer} 🔥
+lmaooo
+fr fr
+WWW
+no shot 😭
+hahaha
+based
+💀`;
+
+const NORMAL = `hii {streamer}
+yo whats up chat
+LOL
+W stream
+this is so chill
+how long you been live?
+first time catching the stream, love it
+{user} hey!!
+lmaooo
+real
+no way
+what are we doing today {streamer}?
+is this the new setup?
+the vibes are immaculate
+just got here what did I miss
+W
+LETS GOOO
+bro 😭
+hahaha
+{streamer} you good?
+facts
+chat is moving fast today
+hello from Brazil
+hello from the UK
+huh
+been here since the start
+o7
+{viewers} viewers lets gooo
+we love {streamer}
+💀💀💀
+lurking but loving it
+{user} fr
+that's crazy
+😂😂
+honestly so true
+ayo
+hype
+what i miss
+wya
+hows it going
+mm understandable
+yo
+yo
+hi chat
+hi chat
+how's everyone doing
+how's everyone doing
+just got here
+just got here
+back
+back
+brb
+brb
+lol
+lol
+true
+true
+fair
+fair
+ok
+ok
+wait what
+wait what
+nice
+nice
+same
+same
+fr
+fr
+valid
+valid
+oh word?
+oh word?
+ngl
+ngl
+😭
+😭
+just vibing
+just vibing
+good vibes today
+good vibes today
+gm chat
+gm chat
+lmao
+lmao
+my cat just knocked my water over
+im eating cereal with a fork rn
+chat is a pigeon a dove
+my mom just walked in 😭
+who else in class rn
+i just sneezed 4 times
+random but i love pickles
+my dog barking at nothing again
+what time is it there
+does anyone know how to cook rice`;
+
+const PREFAB_DEFAULTS = {
+  "1": { name: "Vote 1", kind: "chat", pct: 85, rate: 180, dur: 45,
+    main: "1\n1\n1\n1\n1\n1\n11\n111\n1111\n1!!\n1 easy\nONE\n1 💯", alt: "2\n2\n22\n2 ngl" },
+  "2": { name: "Vote 2", kind: "chat", pct: 85, rate: 180, dur: 45,
+    main: "2\n2\n2\n2\n2\n2\n22\n222\n2222\n2!!\n2 easy\nTWO\n2 💯", alt: "1\n1\n11\n1 ngl" },
+  "3": { name: "L salesman", kind: "chat", pct: 100, rate: 150, dur: 45,
+    main: "L salesman\nL salesman\nL SALESMAN\nL\nL\nLLLLLL\nhuge L salesman\nL salesman 💀\nbro fumbled the bag\nL SALESMAN 😭\nwalk out bro\nbro taxing fr\nhe TAXING\nhe wyllin yo\ni know a better dealership in fw\nlow tier normie salesman\nhe is trollin you bro no shot\nchudmaxxed salesman\nid leave yo he sucks\nsalesman smoking sum gotta be\nsalesman str8 buns", alt: "" },
+  "4": { name: "W salesman", kind: "chat", pct: 100, rate: 150, dur: 45,
+    main: "W salesman\nW salesman\nW SALESMAN\nW\nW\nWWWWWW\nW salesman fr\nsalesman went crazy\nhe cooked\nW SALESMAN 🔥\ngive that man a raise\nsalesman a chad\ngive yo salesman head\ncrack yo salesman twin\nsalesman is HIM\nsalesman aura farming\nhe locked in fr\nsalesman the goat\nbuy whatever he says twin\nsalesman mogging", alt: "" },
+  "5": { name: "Gorgeous", kind: "chat", pct: 100, rate: 140, dur: 45,
+    main: "she is gorgeous\nshe is gorgeous\nshe's so pretty\nou shiii\nou shiii\nOU SHIII\nou shiii 😍\nshe pretty fr\ngorgeous 😍\nshe's beautiful\nou shiiiiii\n😍😍😍\nyall go together\nshe valid asf\nshe so fine bro\nid let her hit\ndont fumble yo\ngive her ur number\n❤️❤️❤️\n😍❤️\nshe gorgeous ❤️\n💕💕\nou shiii ❤️‍🔥\n🥰", alt: "" },
+  "6": { name: "Roast", kind: "chat", pct: 100, rate: 140, dur: 45,
+    main: "nah bro is NOT it 💀\nugly ahh\nwho let him out\n💀💀💀\nbro got hit with the ugly stick\nhe look like a thumb\nnah 😭\nUGLY\nsir please\nrespectfully no\nbro's face is buffering\nnahhh 💀\nchud maxxed npc\nhe not touching no pape\nGod just be making people\new\nhe got a filter on\nbro is a default character\nwho drew him 💀\nbro loaded in at 144p\nNPC ahh\nunc is cooked\nthe lighting is not helping him", alt: "" },
+  "7": { name: "Normal chat", kind: "normal", pct: 100, rate: 40, dur: 0, main: NORMAL, alt: "" },
+  "8": { name: "Gifted subs", kind: "gifts", pct: 65, rate: 50, dur: 45,
+    main: "how old are you?\nwhere you from?\nwhat car you drive?\nyou got a girl?\nwhat you do for work?\nwhats your dream car?\nhow tall are you?\nyou got any pets?\nwhats your favorite food?\nhow long you been streaming?\nwhat music you listening to?\nyou still in school?\nwhats your zodiac sign?\nwhat was your first car?\nwhere you going after this?\nGIFTER W\nty for the gift!!\nHYPE\nW gifter", alt: "" },
+  "X": { name: "W waiter", kind: "chat", pct: 100, rate: 150, dur: 45,
+    main: "w waiter\nw waiter\nW WAITER\nsuh yo waiter twin\ncrack yo waiter twin\nwaiter is HIM\ntip the waiter big\nwaiter locked in\nW service\nwaiter aura farming\ngive the waiter a raise\nwaiter mogging\nWWWW", alt: "" }
+};
+const KEYS = ["1","2","3","4","5","6","7","8","X"];
+
+const CFG_DEFAULTS = {
+  streamer: "nightowl", title: "out and about, come hang", category: "IRL", tags: "English, IRL",
+  layout: "twitch", source: "back", events: true, names: NAMES, reacts: REACTS
+};
+const VIEW_DEFAULTS = { target: 120, climbTo: 3000, climbSec: 120, wobble: "med" };
+
+/* ================= state ================= */
+const store = {
+  get(k){ try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); } catch {} }
+};
+let cfg = Object.assign({}, CFG_DEFAULTS, store.get("chatline2.cfg") || {});
+let prefabs = loadPrefabs();
+let vset = Object.assign({}, VIEW_DEFAULTS, store.get("chatline2.viewers") || {});
+let live = store.get("chatline2.live") || { on: true, startedAt: Date.now() };
+const vs = { now: vset.target, from: vset.target, climbStart: 0, climbMs: 0 };
+let mode = "7", modeEnds = 0, modeDur = 0;
+let names = [], reacts = [], pl = {};
+let paused = false, wave = null, chatT, eventT, mediaURL = null, stream = null;
+
+function loadPrefabs(){
+  const saved = store.get("chatline2.prefabs") || {};
+  const out = {};
+  for (const k of KEYS) out[k] = Object.assign({}, PREFAB_DEFAULTS[k], saved[k] || {}, { kind: PREFAB_DEFAULTS[k].kind });
+  return out;
+}
+
+/* ================= helpers ================= */
+const COLORS = ["#ff7a8a","#ffb057","#ffd84d","#7be38a","#4fd1c5","#5fb4ff","#8f9bff","#c792ff","#ff8ad8","#ff7b54","#2ee6a8","#b5e655","#ff9f43","#54c7ff"];
+const hash = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+const pick = a => a[Math.floor(Math.random() * a.length)];
+const rint = (a, b) => a + Math.floor(Math.random() * (b - a + 1));
+const lines = s => String(s || "").split("\n").map(x => x.trim()).filter(Boolean);
+const fmtN = n => Math.max(0, Math.round(n)).toLocaleString("en-US");
+const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
+
+function parseAll(){
+  names = lines(cfg.names); if (!names.length) names = lines(NAMES);
+  reacts = lines(cfg.reacts); if (!reacts.length) reacts = lines(REACTS);
+  pl = {};
+  for (const k of KEYS){
+    pl[k] = { main: lines(prefabs[k].main), alt: lines(prefabs[k].alt) };
+    if (k === "7" && !pl[k].main.length) pl[k].main = lines(NORMAL);
+  }
+}
+function fill(t, self){
+  return t.replace(/\{streamer\}/g, cfg.streamer)
+          .replace(/\{game\}/g, cfg.category)
+          .replace(/\{viewers\}/g, fmtN(vs.now))
+          .replace(/\{user\}/g, () => { let n, i = 0; do n = pick(names); while (n === self && names.length > 1 && i++ < 5); return "@" + n; });
+}
+let toastT;
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.hidden = false;
+  clearTimeout(toastT); toastT = setTimeout(() => { t.hidden = true; }, 1800);
+}
+function longPress(el, onLong, onTap){
+  let t = null, fired = false;
+  el.addEventListener("pointerdown", () => { fired = false; clearTimeout(t); t = setTimeout(() => { fired = true; onLong(); }, 550); });
+  const cancel = () => clearTimeout(t);
+  ["pointerup","pointerleave","pointercancel"].forEach(ev => el.addEventListener(ev, cancel));
+  el.addEventListener("click", e => { e.preventDefault(); if (fired){ fired = false; return; } onTap(); });
+  el.addEventListener("contextmenu", e => e.preventDefault());
+}
+
+/* ================= chat rendering ================= */
+const BADGE = {
+  broadcaster: `<svg class="b" viewBox="0 0 16 16" aria-label="Broadcaster"><rect width="16" height="16" rx="3" fill="#e8273b"/><rect x="3" y="5" width="7" height="6" rx="1" fill="#fff"/><path d="M10.5 7.2 13 5.8v4.4l-2.5-1.4z" fill="#fff"/></svg>`,
+  mod: `<svg class="b" viewBox="0 0 16 16" aria-label="Moderator"><rect width="16" height="16" rx="3" fill="#0aa84f"/><path d="M11.5 3 13 4.5 7 10.5 5.5 9z" fill="#fff"/><path d="M4 9.5 6.5 12 5.5 13 3 10.5z" fill="#fff"/></svg>`,
+  vip: `<svg class="b" viewBox="0 0 16 16" aria-label="VIP"><rect width="16" height="16" rx="3" fill="#e005b9"/><path d="M8 3.5 12.5 7 8 12.5 3.5 7z" fill="#fff"/></svg>`,
+  sub: `<svg class="b" viewBox="0 0 16 16" aria-label="Subscriber"><rect width="16" height="16" rx="3" fill="#a873ff"/><path d="m8 3 1.5 3.2 3.5.4-2.6 2.4.7 3.5L8 10.8l-3.1 1.7.7-3.5L3 6.6l3.5-.4z" fill="#fff"/></svg>`
+};
+const badgesFor = n => {
+  const h = hash(n) % 20;
+  if (h === 0) return BADGE.mod + BADGE.sub;
+  if (h === 1) return BADGE.vip;
+  if (h < 9) return BADGE.sub;
+  return "";
+};
+const list = $("list");
+const atBottom = () => list.scrollHeight - list.scrollTop - list.clientHeight < 40;
+function push(el){
+  list.appendChild(el);
+  if (!paused){
+    while (list.children.length > 150) list.firstChild.remove();
+    list.scrollTop = list.scrollHeight;
+  }
+}
+function chatLine(name, text, self){
+  const el = document.createElement("div");
+  el.className = "msg" + (self ? " self" : "");
+  el.insertAdjacentHTML("beforeend", self ? BADGE.broadcaster : badgesFor(name));
+  const u = document.createElement("span");
+  u.className = "u";
+  u.style.color = self ? "var(--accent)" : COLORS[hash(name) % COLORS.length];
+  u.textContent = name;
+  el.appendChild(u);
+  el.appendChild(document.createTextNode(": " + text));
+  push(el);
+}
+function eventLine(lead, sub, kind){
+  const el = document.createElement("div");
+  el.className = "msg event" + (kind ? " " + kind : "");
+  const l = document.createElement("span"); l.className = "lead"; l.textContent = lead; el.appendChild(l);
+  if (sub){ const s = document.createElement("span"); s.className = "sub"; s.textContent = sub; el.appendChild(s); }
+  push(el);
+}
+function systemLine(text){
+  const el = document.createElement("div"); el.className = "msg system"; el.textContent = text; push(el);
+}
+list.addEventListener("scroll", () => { paused = !atBottom(); $("paused").hidden = !paused; }, { passive: true });
+$("paused").addEventListener("click", () => { paused = false; $("paused").hidden = true; list.scrollTop = list.scrollHeight; });
+
+/* ================= chat simulation ================= */
+function giftEvent(n){
+  const g = pick([1,1,1,5,5,5,10,10,20,50]);
+  eventLine(`${n} gifted ${g} Tier 1 sub${g > 1 ? "s" : ""} to ${cfg.streamer}'s community!`,
+            `They've gifted a total of ${fmtN(g * rint(1, 15))} in the channel!`, "gift");
+}
+function normalChatter(){
+  const n = pick(names);
+  if (wave && wave.left > 0){ wave.left--; chatLine(n, wave.text); if (wave.left <= 0) wave = null; return; }
+  if (Math.random() < 0.035) wave = { text: fill(pick(reacts), n), left: rint(5, 12) };
+  chatLine(n, fill(pick(pl["7"].main), n));
+}
+function emit(){
+  const p = prefabs[mode], L = pl[mode];
+  if (p.kind === "normal") return normalChatter();
+  const n = pick(names);
+  if (p.kind === "gifts"){
+    if (!L.main.length || Math.random() * 100 < p.pct) return giftEvent(n);
+    return chatLine(n, fill(pick(L.main), n));
+  }
+  const arr = (!L.alt.length || Math.random() * 100 < p.pct) ? L.main : L.alt;
+  if (!arr.length) return normalChatter();
+  chatLine(n, fill(pick(arr), n));
+}
+function scheduleChat(){
+  clearTimeout(chatT);
+  if (!live.on) return;
+  let rate = Math.max(1, +prefabs[mode].rate || 40);
+  if (mode === "7" && wave) rate *= 3;
+  const mean = 60000 / rate;
+  const d = Math.min(-Math.log(1 - Math.random()) * mean, mean * 4);
+  chatT = setTimeout(() => { emit(); scheduleChat(); }, d);
+}
+function fireEvent(){
+  const n = pick(names), r = Math.random();
+  if (r < 0.5){
+    systemLine(`${n} followed ${cfg.streamer}`);
+  } else if (r < 0.8){
+    const m = rint(1, 30);
+    eventLine(`${n} subscribed${m > 1 ? ` for ${m} months` : ""}!`, Math.random() < 0.5 ? fill(pick(pl["7"].main), n) : "");
+  } else if (r < 0.92){
+    giftEvent(n);
+  } else {
+    const k = rint(8, Math.max(20, Math.round(vset.target * 0.15)));
+    eventLine(`${n} is raiding with ${fmtN(k)} viewers!`, "Welcome in, raiders.", "raid");
+    vs.now += k; vset.target += k; vs.from += k; saveViewers(); renderStats();
+    if (mode === "7"){ wave = { text: pick([`${n.toUpperCase()} RAID`, "raid hype", "welcome raiders!"]), left: rint(8, 16) }; scheduleChat(); }
+  }
+}
+function scheduleEvents(){
+  clearTimeout(eventT);
+  if (!live.on || !cfg.events) return;
+  eventT = setTimeout(() => { fireEvent(); scheduleEvents(); }, rint(25000, 90000));
+}
+
+/* ================= prefab bar ================= */
+const bar = $("prefabs");
+for (const k of KEYS){
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "pf"; b.dataset.k = k;
+  b.innerHTML = `<span>${k}</span><i class="bar"></i>`;
+  longPress(b, () => openPrefabs(k), () => setMode(k === mode && k !== "7" ? "7" : k));
+  bar.appendChild(b);
+}
+const gear = document.createElement("button");
+gear.type = "button"; gear.className = "pf"; gear.setAttribute("aria-label", "Edit prefabs");
+gear.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`;
+gear.addEventListener("click", () => openPrefabs(mode === "7" ? "1" : mode));
+bar.appendChild(gear);
+
+function setMode(k){
+  mode = k;
+  modeDur = k === "7" ? 0 : clamp(+prefabs[k].dur || 45, 1, 3600) * 1000;
+  modeEnds = modeDur ? Date.now() + modeDur : 0;
+  wave = null;
+  renderBar();
+  if (live.on){ emit(); scheduleChat(); }
+}
+function renderBar(){
+  bar.querySelectorAll(".pf[data-k]").forEach(b => {
+    const k = b.dataset.k;
+    b.classList.toggle("on", k === mode);
+    b.setAttribute("aria-pressed", k === mode ? "true" : "false");
+    b.setAttribute("aria-label", `${k}: ${prefabs[k].name}`);
+  });
+}
+function renderProgress(){
+  const now = Date.now();
+  if (modeEnds && now >= modeEnds) setMode("7");
+  bar.querySelectorAll(".pf[data-k]").forEach(b => {
+    b.querySelector(".bar").style.width = (b.dataset.k === mode && modeDur) ? clamp((modeEnds - now) / modeDur * 100, 0, 100) + "%" : "0";
+  });
+  const p = prefabs[mode];
+  $("modeLbl").textContent = !live.on ? "" : modeDur ? `${mode} · ${p.name} · ${Math.ceil((modeEnds - now) / 1000)}s` : "";
+  const climbing = isClimbing();
+  $("climb").classList.toggle("on", climbing);
+  $("climbBar").style.width = climbing ? clamp((now - vs.climbStart) / vs.climbMs * 100, 0, 100) + "%" : "0";
+}
+setInterval(renderProgress, 200);
+
+/* ================= viewers ================= */
+const WOB = { low: .006, med: .018, high: .045 };
+const isClimbing = () => vs.climbMs > 0 && Date.now() - vs.climbStart < vs.climbMs;
+function saveViewers(){ store.set("chatline2.viewers", vset); }
+function viewerTick(){
+  if (!live.on) return;
+  const t = vset.target, w = WOB[vset.wobble] || WOB.med;
+  const el = Date.now() - vs.climbStart;
+  if (vs.climbMs && el < vs.climbMs){
+    const x = el / vs.climbMs;
+    const e = x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2;
+    vs.now = (vs.from + (t - vs.from) * e) * (1 + (Math.random() - .5) * w);
+  } else {
+    vs.climbMs = 0;
+    vs.now += (t - vs.now) * 0.12 + t * w * (Math.random() - .5);
+  }
+  vs.now = Math.max(0, vs.now);
+  renderStats();
+}
+setInterval(viewerTick, 2000);
+function startClimb(to, sec){
+  vs.from = vs.now;
+  vset.target = Math.max(0, to);
+  vs.climbStart = Date.now();
+  vs.climbMs = Math.max(1, sec) * 1000;
+  saveViewers();
+}
+function setViewersNow(v){
+  vset.target = Math.max(0, v); vs.now = vset.target; vs.from = vset.target; vs.climbMs = 0;
+  saveViewers(); renderStats();
+}
+function renderStats(){
+  const v = live.on ? fmtN(vs.now) : "0";
+  $("vCount").textContent = v; $("vPill").textContent = v;
+  if (!$("viewerWrap").hidden) renderViewerLive();
+}
+longPress($("climb"), openViewers, () => {
+  if (isClimbing()){ vset.target = Math.round(vs.now); vs.climbMs = 0; saveViewers(); toast("Climb stopped"); }
+  else startClimb(vset.climbTo, vset.climbSec);
+  renderProgress();
+});
+
+/* ================= uptime + header ================= */
+function uptimeStr(ms){
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}:${String(s % 60).padStart(2, "0")}`;
+}
+function renderClock(){ $("uptime").textContent = live.on ? uptimeStr(Date.now() - live.startedAt) : "Offline"; }
+setInterval(renderClock, 1000);
+
+function renderHeader(){
+  $("app").classList.toggle("irl", cfg.layout === "irl");
+  $("sName").textContent = cfg.streamer;
+  $("avatar").textContent = (cfg.streamer[0] || "?").toUpperCase();
+  $("avatar").classList.toggle("is-live", live.on);
+  $("livePill2").hidden = !live.on;
+  $("sTitle").textContent = cfg.title;
+  $("sCat").textContent = cfg.category;
+  const t = $("sTags"); t.textContent = "";
+  cfg.tags.split(",").map(x => x.trim()).filter(Boolean).slice(0, 5).forEach(x => {
+    const s = document.createElement("span"); s.className = "tag"; s.textContent = x; t.appendChild(s);
+  });
+  document.querySelector(".badges").hidden = !live.on;
+  $("vStat").hidden = !live.on;
+  $("offline").hidden = live.on;
+  renderStats(); renderClock(); renderBar(); renderProgress();
+}
+
+/* ================= live control ================= */
+function goLive(){
+  live = { on: true, startedAt: Date.now() };
+  store.set("chatline2.live", live);
+  vs.now = Math.round(vset.target * 0.3);
+  vs.from = vs.now; vs.climbStart = Date.now(); vs.climbMs = 60000;
+  systemLine(`${cfg.streamer} is live. Welcome to the chat room!`);
+  setMode("7"); renderHeader(); scheduleEvents();
+}
+function endStream(){
+  live = { on: false, startedAt: live.startedAt };
+  store.set("chatline2.live", live);
+  clearTimeout(chatT); clearTimeout(eventT); wave = null; modeEnds = 0; modeDur = 0; mode = "7";
+  systemLine(`${cfg.streamer} has ended the stream after ${uptimeStr(Date.now() - live.startedAt)}.`);
+  renderHeader();
+}
+$("goLive2").addEventListener("click", goLive);
+
+/* ================= your messages ================= */
+$("compose").addEventListener("submit", e => {
+  e.preventDefault();
+  const text = $("say").value.trim();
+  if (!text) return;
+  chatLine(cfg.streamer, text, true);
+  $("say").value = "";
+  paused = false; $("paused").hidden = true; list.scrollTop = list.scrollHeight;
+  if (!live.on) return;
+  const k = rint(2, 6);
+  for (let i = 0; i < k; i++) setTimeout(() => { const n = pick(names); chatLine(n, fill(pick(reacts), n)); }, 700 + Math.random() * 3500);
+});
+
+/* ================= camera / stream picture ================= */
+const cam = $("cam");
+function showMsg(text, retry){ $("stageMsgText").textContent = text; $("camRetry").hidden = !retry; $("stageMsg").hidden = false; }
+function hideMsg(){ $("stageMsg").hidden = true; }
+function stopCam(){
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null; cam.srcObject = null; cam.hidden = true;
+}
+async function startCam(facing){
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    showMsg("The camera works when the app is opened from its https address.", false); return;
+  }
+  showMsg("Starting camera…", false);
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+    cam.srcObject = stream;
+    cam.classList.toggle("mirror", facing === "user");
+    cam.hidden = false;
+    try { await cam.play(); } catch {}
+    hideMsg();
+  } catch (err) {
+    stream = null;
+    showMsg(err && err.name === "NotAllowedError" ? "Camera access is off. Tap below and choose Allow." : "The camera couldn't start.", true);
+  }
+}
+async function applySource(){
+  const src = cfg.source, isCam = src === "back" || src === "front";
+  $("flip").hidden = !isCam;
+  $("media").hidden = src !== "media";
+  if (!isCam) stopCam();
+  if (isCam){ stopCam(); await startCam(src === "back" ? "environment" : "user"); }
+  else if (src === "media" && !mediaURL) showMsg("Pick a photo or video in stream settings.", false);
+  else hideMsg();
+}
+$("camRetry").addEventListener("click", applySource);
+$("flip").addEventListener("click", () => {
+  cfg.source = cfg.source === "back" ? "front" : "back";
+  store.set("chatline2.cfg", cfg); applySource();
+});
+function showMedia(file){
+  if (mediaURL) URL.revokeObjectURL(mediaURL);
+  mediaURL = URL.createObjectURL(file);
+  const m = $("media"); m.textContent = "";
+  let el;
+  if (file.type.startsWith("video/")){
+    el = document.createElement("video");
+    el.src = mediaURL; el.autoplay = true; el.loop = true; el.muted = true; el.playsInline = true;
+    el.setAttribute("playsinline", ""); el.setAttribute("muted", "");
+  } else { el = document.createElement("img"); el.src = mediaURL; el.alt = ""; }
+  m.appendChild(el);
+}
+
+/* keep the screen awake and the camera running */
+let wake = null;
+async function keepAwake(){ try { if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } } catch {} }
+document.addEventListener("pointerdown", keepAwake, { once: true });
+document.addEventListener("visibilitychange", () => {
+  if (document.hidden) return;
+  keepAwake();
+  const isCam = cfg.source === "back" || cfg.source === "front";
+  if (isCam && (!stream || stream.getVideoTracks().every(t => t.readyState === "ended"))) applySource();
+});
+
+/* double-tap the video to hide/show the buttons */
+let lastTap = 0;
+$("stage").addEventListener("click", e => {
+  if (e.target.closest("button")) return;
+  const t = Date.now();
+  if (t - lastTap < 320){
+    lastTap = 0;
+    const clean = $("app").classList.toggle("clean");
+    toast(clean ? "Buttons hidden. Double-tap the video to bring them back." : "Buttons shown");
+  } else lastTap = t;
+});
+
+/* ================= sheets ================= */
+function openSheet(id){ document.querySelectorAll(".sheet-wrap").forEach(w => { w.hidden = w.id !== id; }); }
+function closeSheets(){ document.querySelectorAll(".sheet-wrap").forEach(w => { w.hidden = true; }); }
+document.querySelectorAll(".sheet-wrap").forEach(w => {
+  w.addEventListener("click", e => { if (e.target === w) closeSheets(); });
+  w.querySelectorAll("[data-close]").forEach(b => b.addEventListener("click", closeSheets));
+});
+document.addEventListener("keydown", e => { if (e.key === "Escape") closeSheets(); });
+const radio = (name, v) => { const r = document.querySelector(`input[name="${name}"][value="${v}"]`); if (r) r.checked = true; };
+const radioVal = name => { const r = document.querySelector(`input[name="${name}"]:checked`); return r ? r.value : null; };
+
+/* ---- stream settings ---- */
+function openSettings(){
+  $("fStreamer").value = cfg.streamer;
+  $("fTitle").value = cfg.title;
+  $("fCat").value = cfg.category;
+  $("fTags").value = cfg.tags;
+  $("fEvents").checked = cfg.events;
+  $("fReacts").value = cfg.reacts;
+  $("fNames").value = cfg.names;
+  radio("fLayout", cfg.layout); radio("fSource", cfg.source);
+  const s = Math.floor((Date.now() - live.startedAt) / 1000);
+  $("fUptime").value = live.on ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : "";
+  $("fUptime").dataset.orig = $("fUptime").value;
+  $("fUptime").disabled = !live.on;
+  $("toggleLive").textContent = live.on ? "End stream" : "Go live";
+  $("toggleLive").className = "btn " + (live.on ? "danger" : "");
+  openSheet("settingsWrap");
+}
+$("openSettings").addEventListener("click", openSettings);
+$("toPrefabs").addEventListener("click", () => openPrefabs(mode === "7" ? "1" : mode));
+$("toViewers").addEventListener("click", openViewers);
+$("toggleLive").addEventListener("click", () => { closeSheets(); if (live.on) endStream(); else goLive(); });
+$("fMedia").addEventListener("change", e => {
+  const f = e.target.files && e.target.files[0];
+  if (!f) return;
+  showMedia(f); radio("fSource", "media");
+});
+$("settings").addEventListener("submit", e => {
+  e.preventDefault();
+  const oldSource = cfg.source;
+  Object.assign(cfg, {
+    streamer: $("fStreamer").value.trim() || CFG_DEFAULTS.streamer,
+    title: $("fTitle").value.trim(),
+    category: $("fCat").value.trim() || CFG_DEFAULTS.category,
+    tags: $("fTags").value,
+    events: $("fEvents").checked,
+    reacts: $("fReacts").value,
+    names: $("fNames").value,
+    layout: radioVal("fLayout") || "twitch",
+    source: radioVal("fSource") || "scene"
+  });
+  store.set("chatline2.cfg", cfg);
+  parseAll();
+  const up = $("fUptime").value.trim();
+  if (live.on && up && up !== $("fUptime").dataset.orig){
+    const m = up.match(/^(\d+)(?:[:.](\d{1,2}))?$/);
+    if (m){
+      const mins = m[2] === undefined ? +m[1] : +m[1] * 60 + +m[2];
+      live.startedAt = Date.now() - mins * 60000; store.set("chatline2.live", live);
+    }
+  }
+  closeSheets(); renderHeader(); scheduleEvents();
+  if (cfg.source !== oldSource || cfg.source === "media") applySource();
+});
+
+/* ---- prefab editor ---- */
+let draft = null, cur = "1";
+const tabs = $("pTabs");
+for (const k of KEYS){
+  const b = document.createElement("button");
+  b.type = "button"; b.textContent = k; b.dataset.k = k;
+  b.addEventListener("click", () => { readFields(); cur = k; writeFields(); });
+  tabs.appendChild(b);
+}
+function openPrefabs(k){
+  draft = JSON.parse(JSON.stringify(prefabs));
+  cur = k || "1";
+  writeFields();
+  openSheet("prefabWrap");
+}
+function readFields(){
+  const p = draft[cur];
+  p.name = $("pName").value.trim() || PREFAB_DEFAULTS[cur].name;
+  p.main = $("pMain").value;
+  p.alt = $("pAlt").value;
+  p.pct = +$("pPct").value;
+  p.rate = +$("pRate").value;
+  p.dur = clamp(parseInt($("pDur").value, 10) || 45, 1, 3600);
+}
+function writeFields(){
+  const p = draft[cur];
+  tabs.querySelectorAll("button").forEach(b => b.classList.toggle("on", b.dataset.k === cur));
+  $("pName").value = p.name;
+  $("pMain").value = p.main;
+  $("pAlt").value = p.alt;
+  $("pPct").value = p.pct;
+  $("pRate").value = p.rate;
+  $("pDur").value = p.dur || 45;
+  $("pAltField").hidden = p.kind !== "chat";
+  $("pPctField").hidden = p.kind === "normal";
+  $("pDurField").hidden = p.kind === "normal";
+  $("pMainLbl").textContent = p.kind === "gifts" ? "Chat messages between gift alerts" : p.kind === "normal" ? "Chat messages" : "Main messages";
+  $("pNote").textContent = p.kind === "normal"
+    ? "This is the default. Chat comes back here when any other prefab ends."
+    : p.kind === "gifts" ? "Spams gifted sub alerts from random chatters, with questions for you and hype messages in between."
+    : "Spams the main messages, with a few of the mixed-in messages sprinkled through.";
+  updateLabels();
+}
+function updateLabels(){
+  const p = draft[cur];
+  const v = +$("pPct").value;
+  $("pPctLbl").textContent = p.kind === "gifts" ? `Gift alerts: ${v}% (the rest are chat messages)` : `Main messages: ${v}% (the rest are mixed-in)`;
+  $("pRateLbl").textContent = `Speed: ${$("pRate").value} messages a minute`;
+}
+$("pPct").addEventListener("input", updateLabels);
+$("pRate").addEventListener("input", updateLabels);
+$("pReset").addEventListener("click", () => { draft[cur] = Object.assign({}, PREFAB_DEFAULTS[cur]); writeFields(); });
+$("prefabForm").addEventListener("submit", e => {
+  e.preventDefault();
+  readFields();
+  prefabs = draft;
+  store.set("chatline2.prefabs", prefabs);
+  parseAll(); closeSheets(); renderBar();
+  if (live.on) scheduleChat();
+  toast("Prefabs saved");
+});
+
+/* ---- viewer controls ---- */
+const QUICK = [1000, 3000, 5000, 10000, 25000, 50000, 100000];
+QUICK.forEach(n => {
+  const b = document.createElement("button");
+  b.type = "button"; b.className = "chipbtn"; b.textContent = n >= 1000 ? (n / 1000) + "K" : String(n);
+  b.addEventListener("click", () => { $("vTo").value = n; saveViewerFields(); });
+  $("vQuick").appendChild(b);
+});
+function openViewers(){
+  $("vNow").value = "";
+  $("vTo").value = vset.climbTo;
+  radio("vTime", vset.climbSec); radio("vWob", vset.wobble);
+  renderViewerLive();
+  openSheet("viewerWrap");
+}
+document.querySelectorAll("[data-open-viewers]").forEach(b => b.addEventListener("click", openViewers));
+function renderViewerLive(){
+  $("vBig").textContent = live.on ? fmtN(vs.now) : "0";
+  $("vState").textContent = !live.on ? "Stream is offline"
+    : isClimbing() ? `Heading to ${fmtN(vset.target)} · ${Math.ceil((vs.climbMs - (Date.now() - vs.climbStart)) / 1000)}s left`
+    : `Hovering around ${fmtN(vset.target)}`;
+}
+function saveViewerFields(){
+  const to = parseInt($("vTo").value, 10);
+  if (Number.isFinite(to) && to >= 0) vset.climbTo = to;
+  vset.climbSec = +(radioVal("vTime") || vset.climbSec);
+  vset.wobble = radioVal("vWob") || vset.wobble;
+  saveViewers();
+}
+["vTo"].forEach(id => $(id).addEventListener("change", saveViewerFields));
+document.querySelectorAll('input[name="vTime"],input[name="vWob"]').forEach(r => r.addEventListener("change", saveViewerFields));
+$("vSetNow").addEventListener("click", () => {
+  const v = parseInt($("vNow").value, 10);
+  if (!Number.isFinite(v) || v < 0){ toast("Type a number first"); return; }
+  setViewersNow(v); $("vNow").value = ""; renderViewerLive(); toast(`Viewers set to ${fmtN(v)}`);
+});
+$("viewerForm").addEventListener("submit", e => {
+  e.preventDefault();
+  saveViewerFields();
+  if (!live.on){ toast("Go live first"); return; }
+  startClimb(vset.climbTo, vset.climbSec);
+  closeSheets(); renderProgress();
+});
+
+/* ================= start ================= */
+parseAll();
+renderHeader();
+applySource();
+if (live.on){
+  systemLine("Welcome to the chat room!");
+  for (let i = 0; i < 14; i++) normalChatter();
+  wave = null;
+  scheduleChat(); scheduleEvents();
+} else {
+  systemLine(`${cfg.streamer} is offline.`);
+}
+})();
+</script>
+</body>
+</html>
