@@ -2048,8 +2048,14 @@ function renderNet(){
   const pcOn = r === "host" && [...net.conns.values()].some(x => x.clips);
   $("pcHow").textContent = pcOn ? "Your PC is connected. Tap CLIP and the clip goes into your PC folder."
     : r === "host" ? `On your PC, open ${pcPage} in Chrome or Edge and type the code ${netCfg.hostCode}.`
-    : r === "follower" ? "Only the main phone sends clips to the PC."
+    : r === "follower" ? `This page can't save clips. To save the main phone's clips on a computer, open ${pcPage} there instead and type the code ${netCfg.joinCode}.`
     : `Tap Start room, then on your PC open ${pcPage} in Chrome or Edge and type the code it shows.`;
+  // on a computer, make it one click
+  if (r === "follower" && "showDirectoryPicker" in window){
+    const a = document.createElement("a");
+    a.href = "pc.html"; a.textContent = "Open the PC page"; a.style.color = "var(--accent)"; a.style.fontWeight = "700";
+    $("pcHow").append(" ", a);
+  }
   $("jCam2").checked = !!netCfg.sendCam;
   $("netBadge").textContent = r === "host" ? `· Room ${netCfg.hostCode} · ${net.conns.size}`
     : r === "follower" ? (net.hostConn && net.hostConn.open ? "· Synced" : "· Reconnecting…") : "";
