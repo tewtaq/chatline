@@ -191,7 +191,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:20;background:var(--scrim);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
 /* ---- connected phones ---- */
-.follower .prefabs,.follower .climb,.follower #toggleLive{display:none!important}
+.follower .prefabs,.follower .climb,.follower #toggleLive,.follower #toPrefabs,.follower #toViewers{display:none!important}
 .netbadge{margin-left:8px;color:var(--ok);letter-spacing:.04em}
 .bignum b.code{color:var(--fg);letter-spacing:.12em}
 @media (prefers-reduced-motion:reduce){.scene{animation:none}}
@@ -822,15 +822,14 @@ function renderProgress(){
   const now = Date.now();
   if (isFollower()){
     const h = net.hostView;
-    $("modeLbl").textContent = h && h.on && h.ends > now ? `${h.mode} · ${h.name} · ${Math.ceil((h.ends - now) / 1000)}s` : "";
+    $("modeLbl").textContent = h && h.on && h.ends > now ? h.mode : "";
     return;
   }
   if (modeEnds && now >= modeEnds) setMode("7");
   bar.querySelectorAll(".pf[data-k]").forEach(b => {
     b.querySelector(".bar").style.width = (b.dataset.k === mode && modeDur) ? clamp((modeEnds - now) / modeDur * 100, 0, 100) + "%" : "0";
   });
-  const p = prefabs[mode];
-  $("modeLbl").textContent = !live.on ? "" : modeDur ? `${mode} · ${p.name} · ${Math.ceil((modeEnds - now) / 1000)}s` : "";
+  $("modeLbl").textContent = live.on && modeDur ? mode : "";
   const climbing = isClimbing();
   $("climb").classList.toggle("on", climbing);
   $("climbBar").style.width = climbing ? clamp((now - vs.climbStart) / vs.climbMs * 100, 0, 100) + "%" : "0";
@@ -1283,7 +1282,7 @@ function broadcast(m){
 function hostState(){
   return { t: "state", streamer: cfg.streamer, title: cfg.title, category: cfg.category, tags: cfg.tags,
            on: live.on, up: Date.now() - live.startedAt, v: Math.round(vs.now),
-           mode, name: prefabs[mode].name, left: modeEnds ? Math.max(0, modeEnds - Date.now()) : 0 };
+           mode, left: modeEnds ? Math.max(0, modeEnds - Date.now()) : 0 };
 }
 function pushState(){ if (net.role === "host" && net.conns.size) broadcast(hostState()); }
 
@@ -1367,7 +1366,7 @@ function joinRoom(code){
   netCfg.joinCode = code; netCfg.mode = "follower"; saveNet();
   net.role = "follower";
   stopSim();
-  $("app").classList.add("follower");
+  document.body.classList.add("follower");
   list.textContent = "";
   systemLine("Connecting to the main phone…", true);
   setNetStatus("Connecting…");
@@ -1434,7 +1433,7 @@ function applyHostState(s){
   Object.assign(cfg, { streamer: String(s.streamer || ""), title: String(s.title || ""), category: String(s.category || ""), tags: String(s.tags || "") });
   live = { on: !!s.on, startedAt: Date.now() - (+s.up || 0) };
   vs.now = +s.v || 0;
-  net.hostView = { on: !!s.on, mode: String(s.mode || "7"), name: String(s.name || ""), ends: Date.now() + (+s.left || 0) };
+  net.hostView = { on: !!s.on, mode: String(s.mode || "7"), ends: Date.now() + (+s.left || 0) };
   renderHeader();
 }
 
@@ -1478,7 +1477,7 @@ function leaveNet(keepMode){
   const p = net.peer; net.peer = null;
   if (p){ try { p.destroy(); } catch {} }
   net.role = "solo"; net.status = ""; net.hostView = null;
-  $("app").classList.remove("follower");
+  document.body.classList.remove("follower");
   if (!keepMode){ netCfg.mode = "solo"; saveNet(); }
   if (wasFollower){
     cfg = Object.assign({}, CFG_DEFAULTS, store.get("chatline2.cfg") || {});
