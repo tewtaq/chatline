@@ -351,13 +351,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button type="button" class="btn danger" id="leaveBtn">Leave</button>
     </div>
 
-    <div id="pcFolder" class="field" style="gap:10px" hidden>
-      <h3>Clip folder on this computer</h3>
-      <p class="note" id="pcFolderNote"></p>
-      <div class="chips">
-        <button type="button" class="chipbtn" id="allowFolder" hidden>Allow saving</button>
-        <button type="button" class="chipbtn" id="pickFolder">Choose folder</button>
-      </div>
+    <div class="field" style="gap:6px">
+      <h3>Clips to your PC</h3>
+      <p class="note" id="pcHow"></p>
     </div>
 
     <h3>Relay for mobile data</h3>
@@ -1609,9 +1605,7 @@ async function sendClip(c, it){
   }
 }
 
-/* small on-device storage: the PC's chosen folder ("kv") and the phone's clips waiting for the PC ("clips") */
-const folderSupported = "showDirectoryPicker" in window;
-const pcDir = { handle: null, ok: false, parts: new Map() };
+/* the phone's clips waiting for the PC, kept on the phone even if the app closes */
 function kvDB(){
   return new Promise((res, rej) => {
     const r = indexedDB.open("chatline", 2);
@@ -1623,11 +1617,6 @@ function kvDB(){
     r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
   });
 }
-async function kvGet(k){
-  try { const db = await kvDB(); return await new Promise(res => { const q = db.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); }
-  catch { return null; }
-}
-async function kvSet(k, v){ try { const db = await kvDB(); db.transaction("kv", "readwrite").objectStore("kv").put(v, k); } catch {} }
 async function kvPutClip(it){
   try {
     const db = await kvDB();
@@ -1638,70 +1627,6 @@ async function kvDelClip(id){ try { const db = await kvDB(); db.transaction("cli
 async function kvAllClips(){
   try { const db = await kvDB(); return await new Promise(res => { const q = db.transaction("clips").objectStore("clips").getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); }
   catch { return []; }
-}
-
-async function folderCheck(ask){
-  let ok = false;
-  if (pcDir.handle){
-    try {
-      let p = await pcDir.handle.queryPermission({ mode: "readwrite" });
-      if (p !== "granted" && ask) p = await pcDir.handle.requestPermission({ mode: "readwrite" });
-      ok = p === "granted";
-    } catch {}
-  }
-  pcDir.ok = ok;
-  renderFolder(); tellHostFolder();
-  return ok;
-}
-function tellHostFolder(){
-  if (isFollower() && net.hostConn && net.hostConn.open){ try { net.hostConn.send({ t: "clipdir", on: pcDir.ok }); } catch {} }
-}
-function renderFolder(){
-  $("pcFolder").hidden = !folderSupported;
-  if (!folderSupported) return;
-  const h = pcDir.handle;
-  $("pcFolderNote").textContent = !h ? "Pick a folder and every clip the phone takes gets saved into it. Join the phone's room on this PC too."
-    : !pcDir.ok ? `Saving to "${h.name}" needs your OK again after the page reloads. Tap Allow saving.`
-    : isFollower() ? `Clips from the phone are saved into "${h.name}".`
-    : `Clips will be saved into "${h.name}". Join the phone's room above to start getting them.`;
-  $("allowFolder").hidden = !h || pcDir.ok;
-  $("pickFolder").textContent = h ? "Change folder" : "Choose folder";
-}
-$("pickFolder").addEventListener("click", async () => {
-  try {
-    const h = await window.showDirectoryPicker({ id: "chatline-clips", mode: "readwrite", startIn: "videos" });
-    pcDir.handle = h; kvSet("clipDir", h);
-    if (await folderCheck(true)) toast(`Clips will be saved into "${h.name}"`);
-  } catch (err) { if (!err || err.name !== "AbortError") toast("Couldn't use that folder. Try another one."); }
-});
-$("allowFolder").addEventListener("click", () => folderCheck(true));
-
-function pcReceive(d){
-  const id = String(d.id || "");
-  const bin = d.data instanceof ArrayBuffer || ArrayBuffer.isView(d.data) || d.data instanceof Blob;
-  if (!id || !bin) return;
-  let e = pcDir.parts.get(id);
-  if (!e){ e = { parts: [], got: 0, n: +d.n || 1 }; pcDir.parts.set(id, e); }
-  if (!e.parts[d.i]){ e.parts[d.i] = d.data; e.got++; }
-  if (e.got < e.n) return;
-  pcDir.parts.delete(id);
-  const name = String(d.name || "clip.mp4").replace(/[\\/:*?"<>|]/g, "_");
-  pcSave(id, name, new Blob(e.parts, { type: String(d.type || "video/mp4") }));
-}
-async function pcSave(id, name, blob){
-  if (!pcDir.ok && !(await folderCheck(false))){
-    toast("A clip came in. Tap Allow saving in Connect phones, and the phone will send it again.");
-    return;
-  }
-  try {
-    const fh = await pcDir.handle.getFileHandle(name, { create: true });
-    const w = await fh.createWritable();
-    await w.write(blob); await w.close();
-    toast(`Saved ${name} to "${pcDir.handle.name}"`);
-    try { net.hostConn.send({ t: "clipsaved", id }); } catch {}
-  } catch {
-    toast("Couldn't write the clip into your folder. Try Allow saving or pick the folder again.");
-  }
 }
 function setRemoteCam(s, call){
   if (net.remote && net.remote.call !== call){ try { net.remote.call.close(); } catch {} }
@@ -1770,7 +1695,6 @@ function connectToHost(){
   conn.on("open", () => {
     clearTimeout(timer);
     setNetStatus("Synced with the main phone");
-    tellHostFolder();
     if (netCfg.sendCam) startSendCam();
   });
   conn.on("data", onFollowerData);
@@ -1783,7 +1707,6 @@ function onFollowerData(d){
     (Array.isArray(d.hist) ? d.hist : []).forEach(showRemote);
     if (d.state) applyHostState(d.state);
   } else if (d.t === "state") applyHostState(d);
-  else if (d.t === "clippart") pcReceive(d);
   else showRemote(d);
 }
 function showRemote(m){
@@ -1881,6 +1804,12 @@ function renderNet(){
       ? `${n} phone${n > 1 ? "s" : ""} connected${c ? ` · ${c} sending a camera` : ""}${net.remote ? " · friend's camera is coming through" : ""}${f ? " · computer clip folder connected" : ""}`
       : "No phones connected yet.";
   } else $("netPeers").textContent = "";
+  const pcPage = (location.host + location.pathname).replace(/[^/]*$/, "") + "pc.html";
+  const pcOn = r === "host" && [...net.conns.values()].some(x => x.clips);
+  $("pcHow").textContent = pcOn ? "Your PC is connected. Tap CLIP and the clip goes into your PC folder."
+    : r === "host" ? `On your PC, open ${pcPage} in Chrome or Edge and type the code ${netCfg.hostCode}.`
+    : r === "follower" ? "Only the main phone sends clips to the PC."
+    : `Tap Start room, then on your PC open ${pcPage} in Chrome or Edge and type the code it shows.`;
   $("jCam2").checked = !!netCfg.sendCam;
   $("netBadge").textContent = r === "host" ? `· Room ${netCfg.hostCode} · ${net.conns.size}`
     : r === "follower" ? (net.hostConn && net.hostConn.open ? "· Synced" : "· Reconnecting…") : "";
@@ -1892,7 +1821,7 @@ function openNet(){
   $("rServer").value = netCfg.relayServer || "";
   $("rUser").value = netCfg.relayUser || "";
   $("rPass").value = netCfg.relayPass || "";
-  renderNet(); renderFolder();
+  renderNet();
   openSheet("netWrap");
 }
 $("hostStart").addEventListener("click", startHost);
@@ -1943,9 +1872,7 @@ kvAllClips().then(saved => {
   clip.pending = saved.filter(it => it && it.blob && !have.has(it.id)).concat(clip.pending);
   renderClipCount();
   clip.pending.forEach(it => sendClipToFolders(it));
-});
-if (folderSupported) kvGet("clipDir").then(h => { if (h){ pcDir.handle = h; folderCheck(false); } });
-if (netCfg.mode === "follower" && netCfg.joinCode){
+});if (netCfg.mode === "follower" && netCfg.joinCode){
   joinRoom(netCfg.joinCode);
 } else {
   applySource();
