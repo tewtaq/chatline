@@ -70,7 +70,10 @@ li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-num
 .note{color:var(--muted);font-size:13px;margin:0}
 .camwrap{display:grid;gap:10px}
 .camhead{display:flex;justify-content:space-between;align-items:center}
-.camhead .btn{padding:6px 12px;font-size:13px}
+.camctl{display:flex;gap:6px}
+.camhead .btn{padding:6px 12px;font-size:13px;display:inline-flex;gap:6px;align-items:center}
+.camhead .btn svg{width:15px;height:15px}
+#camNote{color:var(--warn)}
 .cam{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:grid;place-items:center}
 .cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .cammsg{position:relative;margin:0;padding:16px;text-align:center;color:var(--muted);font-size:14px}
@@ -114,12 +117,16 @@ li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-num
   <section class="camwrap" id="camWrap" hidden>
     <div class="camhead">
       <h2>Phone camera</h2>
-      <button type="button" class="btn ghost" id="camToggle">Hide</button>
+      <div class="camctl">
+        <button type="button" class="btn ghost" id="soundToggle" aria-pressed="true"></button>
+        <button type="button" class="btn ghost" id="camToggle">Hide</button>
+      </div>
     </div>
     <div class="cam" id="camBox">
       <video id="phoneCam" playsinline autoplay muted></video>
       <p class="cammsg" id="camMsg"></p>
     </div>
+    <p class="note" id="camNote" hidden></p>
   </section>
 
   <section style="display:grid;gap:10px">
@@ -155,10 +162,12 @@ const st = {
   code: "", dir: null, ok: false,
   peer: null, conn: null, retryT: null, noPhone: false, failed: "",
   parts: new Map(), recv: null,
-  watch: true, call: null, live: false
+  watch: true, call: null, live: false,
+  sound: true, soundBlocked: false, micOff: false
 };
 try { st.code = normCode(localStorage.getItem("chatlinePC.code")); } catch {}
 try { st.watch = localStorage.getItem("chatlinePC.watch") !== "off"; } catch {}
+try { st.sound = localStorage.getItem("chatlinePC.sound") !== "off"; } catch {}
 
 /* ---- remembering the folder (browsers keep folder access in IndexedDB) ---- */
 function db(){
@@ -210,12 +219,13 @@ function connect(){
       if (!call.metadata || call.metadata.role !== "main"){ try { call.close(); } catch {} return; }
       if (st.call && st.call !== call){ try { st.call.close(); } catch {} }
       st.call = call; st.live = false;
+      st.micOff = !call.metadata.sound;
       call.answer();
       call.on("stream", s => {
         if (st.call !== call) return;
-        const v = $("phoneCam");
-        v.srcObject = s; v.play().catch(() => {});
-        st.live = true; render();
+        $("phoneCam").srcObject = s;
+        st.live = true;
+        applySound();
       });
       const end = () => { if (st.call === call) dropCall(); };
       call.on("close", end); call.on("error", end);
@@ -273,13 +283,35 @@ function openConn(){
 }
 const linked = () => !!(st.conn && st.conn.open);
 /* tell the phone whether clips can be saved here (it sends waiting clips as soon as this is on)
-   and whether to show its camera (only while this page is on screen) */
+   and whether to send its camera: while this page is on screen, or in the background too when
+   the sound is on (so you can keep listening) */
+const wantCam = () => st.watch && (!document.hidden || st.sound);
 function tell(){
   if (!linked()) return;
   try { st.conn.send({ t: "clipdir", on: st.ok }); } catch {}
-  try { st.conn.send({ t: "watch", on: st.watch && !document.hidden }); } catch {}
-  if (!st.watch || document.hidden) dropCall();
+  try { st.conn.send({ t: "watch", on: wantCam(), sound: true }); } catch {}
+  if (!wantCam()) dropCall();
 }
+
+/* ---- sound: browsers only play sound after you've clicked on the page, so it may start muted ---- */
+function applySound(){
+  const v = $("phoneCam");
+  st.soundBlocked = false;
+  if (!st.sound){ v.muted = true; v.play().catch(() => {}); render(); return; }
+  v.muted = false;
+  v.play().catch(() => {
+    st.soundBlocked = true;
+    v.muted = true; v.play().catch(() => {});
+    render();
+  });
+  render();
+}
+function unblockSound(e){
+  if (e && e.target && e.target.closest && e.target.closest("#soundToggle")) return; // that button handles itself
+  if (st.soundBlocked) applySound();
+}
+document.addEventListener("pointerdown", unblockSound);
+document.addEventListener("keydown", unblockSound);
 
 /* ---- receiving and saving clips ---- */
 function onData(d){
@@ -328,12 +360,23 @@ function setStatus(kind, text){
   $("statusText").textContent = text;
   document.title = (kind === "ready" ? "● " : "") + "Chatline Clip Folder";
 }
+const ICON_ON = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7M18.5 5.5a9 9 0 0 1 0 13"/></svg>`;
+const ICON_OFF = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M11 5 6 9H3v6h3l5 4z"/><path d="m16 9 6 6M22 9l-6 6"/></svg>`;
 function renderCam(){
   $("camWrap").hidden = !linked();
   $("camToggle").textContent = st.watch ? "Hide" : "Show";
   $("camBox").hidden = !st.watch;
   $("camMsg").hidden = st.live;
   $("camMsg").textContent = "Waiting for your phone's camera. It shows while Chatline on your phone has its camera on.";
+  const t = $("soundToggle");
+  t.hidden = !st.watch;
+  t.innerHTML = (st.sound ? ICON_ON : ICON_OFF) + `<span>${st.sound ? "Sound on" : "Sound off"}</span>`;
+  t.setAttribute("aria-pressed", st.sound ? "true" : "false");
+  const note = !st.watch || !st.live || !st.sound ? ""
+    : st.micOff ? "No sound from the phone: its microphone is off. Allow the microphone for Chatline on your phone."
+    : st.soundBlocked ? "Click anywhere on this page to hear the sound."
+    : "";
+  $("camNote").hidden = !note; $("camNote").textContent = note;
 }
 function render(){
   renderCam();
@@ -379,6 +422,12 @@ codeIn.addEventListener("keydown", e => { if (e.key === "Enter") codeChanged(); 
 $("pick").addEventListener("click", pickFolder);
 $("change").addEventListener("click", pickFolder);
 $("allow").addEventListener("click", () => checkFolder(true));
+$("soundToggle").addEventListener("click", () => {
+  if (st.sound && st.soundBlocked){ applySound(); return; } // first click just lets the sound play
+  st.sound = !st.sound;
+  try { localStorage.setItem("chatlinePC.sound", st.sound ? "on" : "off"); } catch {}
+  applySound(); tell();
+});
 $("camToggle").addEventListener("click", () => {
   st.watch = !st.watch;
   try { localStorage.setItem("chatlinePC.watch", st.watch ? "on" : "off"); } catch {}
