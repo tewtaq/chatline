@@ -1,0 +1,13 @@
+{
+  "name": "Chatline Live",
+  "short_name": "Chatline",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0e0d12",
+  "theme_color": "#0e0d12",
+  "icons": [
+    { "src": "icon.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
