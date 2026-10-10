@@ -345,7 +345,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     </div>
 
     <h3>Relay for mobile data</h3>
-    <p class="note">Phones on mobile data in different places usually need a relay to connect. Make a free account at expressturn.com and copy the server, username and password from its dashboard. Put it on the main phone first. If a phone still can't connect, add it on that phone too.</p>
+    <p class="note">A relay is already built in, so phones on mobile data can connect. Only fill these in to use a different relay; leave them empty to use the built-in one.</p>
     <div class="field"><label for="rServer">Relay server</label><input id="rServer" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="relay1.expressturn.com:3478"></div>
     <div class="row2">
       <div class="field"><label for="rUser">Username</label><input id="rUser" type="text" autocapitalize="off" autocomplete="off" autocorrect="off"></div>
@@ -1244,14 +1244,18 @@ const makeCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Mat
 const normCode = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
 const peerId = code => "chatline-live-" + code.toLowerCase();
 const NET_RETRY = ["network", "server-error", "socket-error", "socket-closed", "disconnected"];
+/* built-in relay (ExpressTURN free plan); a phone's own Relay fields override it */
+const BUILTIN_RELAY = { server: "free.expressturn.com:3478", user: "000000002106968723", pass: "yGwvmAYW4X/Ck9BRD5DCV3pbMtA=" };
 
 function iceConfig(){
   const servers = [{ urls: "stun:stun.l.google.com:19302" }];
-  let host = String(netCfg.relayServer || "").trim().replace(/^(turns?|stun):/i, "").replace(/\?.*$/, "");
+  const own = netCfg.relayServer && netCfg.relayUser && netCfg.relayPass;
+  const r = own ? { server: netCfg.relayServer, user: netCfg.relayUser, pass: netCfg.relayPass } : BUILTIN_RELAY;
+  let host = String(r.server || "").trim().replace(/^(turns?|stun):/i, "").replace(/\?.*$/, "");
   if (host && !/:\d+$/.test(host)) host += ":3478";
-  if (host && netCfg.relayUser && netCfg.relayPass){
+  if (host && r.user && r.pass){
     servers.push({ urls: "stun:" + host });
-    servers.push({ urls: [`turn:${host}?transport=udp`, `turn:${host}?transport=tcp`], username: netCfg.relayUser, credential: netCfg.relayPass });
+    servers.push({ urls: [`turn:${host}?transport=udp`, `turn:${host}?transport=tcp`], username: r.user, credential: r.pass });
   }
   return { iceServers: servers };
 }
@@ -1400,7 +1404,7 @@ function connectToHost(){
     net.hostConn = null;
     try { conn.close(); } catch {}
     stopSendCall();
-    setNetStatus(netCfg.relayUser ? "Lost the main phone. Reconnecting…" : "Can't reach the main phone. Reconnecting… On mobile data, add a relay below.");
+    setNetStatus("Lost the main phone. Reconnecting…");
     scheduleRejoin();
   }
   conn.on("open", () => {
