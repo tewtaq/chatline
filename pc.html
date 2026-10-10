@@ -441,6 +441,8 @@ function wake(){
   else if (st.peer.disconnected){ try { st.peer.reconnect(); } catch {} }
   else if (!st.conn && st.peer.open) openConn();
 }
+// check in with the phone so it knows this page is still here
+setInterval(() => { if (linked()){ try { st.conn.send({ t: "ping" }); } catch {} } }, 3000);
 window.addEventListener("online", wake);
 document.addEventListener("visibilitychange", () => { tell(); if (!document.hidden) wake(); });
 setInterval(wake, 15000);
