@@ -1098,6 +1098,7 @@ async function getMic(){
 }
 function stopMic(){
   if (clip.mic){ clip.mic.getTracks().forEach(t => t.stop()); clip.mic = null; }
+  feedWatchers();
 }
 
 /* ---- the always-running recording ---- */
@@ -1132,6 +1133,7 @@ function clipStart(tall){
   clipTick();
   // sound joins as soon as the microphone is ready (recorders started after that have it)
   getMic().then(mic => {
+    feedWatchers(); // the PC's camera feed gets the sound too
     const sound = mic && mic.getAudioTracks()[0];
     if (!sound || gen !== clip.gen || !clip.stream) return;
     clip.stream.addTrack(sound);
@@ -1577,7 +1579,7 @@ function onHostData(conn, d){
     if (c){ c.cam = !!d.on; renderNet(); }
   } else if (d.t === "watch"){
     const c = net.conns.get(conn.peer);
-    if (c){ c.watch = !!d.on; feedWatcher(c); renderNet(); }
+    if (c){ c.watch = !!d.on; c.sound = !!d.sound; feedWatcher(c); renderNet(); }
   } else if (d.t === "clipdir"){
     const c = net.conns.get(conn.peer);
     if (c){
@@ -1601,12 +1603,18 @@ function onHostData(conn, d){
 }
 
 /* ---- showing this phone's camera to joined phones and the PC ----
-   A joined device asks with {t:"watch", on}. The main phone calls it with its camera, swaps the
-   picture when the camera flips, and hangs up while its camera is off. */
+   A joined device asks with {t:"watch", on, sound}. The main phone calls it with its camera (plus
+   the microphone used for clip sound, if the PC asked for sound), swaps the picture when the camera
+   flips, and hangs up while its camera is off. */
 /* (a send-only call never counts as "open" in PeerJS, so look at the connection itself) */
 function callUp(k){
   const pc = k && k.peerConnection;
   return !!pc && (pc.connectionState === "connected" || ["connected", "completed"].includes(pc.iceConnectionState));
+}
+const micTrack = () => (clip.mic && clip.mic.getAudioTracks().find(t => t.readyState === "live")) || null;
+function senderFor(pc, kind){
+  const tr = pc && pc.getTransceivers().find(x => x.receiver && x.receiver.track && x.receiver.track.kind === kind);
+  return tr ? tr.sender : null;
 }
 function feedWatcher(c){
   const t = camLive() && stream.getVideoTracks()[0];
@@ -1614,15 +1622,20 @@ function feedWatcher(c){
     if (c.mainCall){ const k = c.mainCall; c.mainCall = null; try { k.close(); } catch {} }
     return;
   }
+  const a = c.sound ? micTrack() : null;
   if (callUp(c.mainCall)){
     const pc = c.mainCall.peerConnection;
-    if (pc) pc.getSenders().forEach(s => { if (s.track && s.track.kind === "video" && s.track !== t) s.replaceTrack(t).catch(() => {}); });
-    return;
+    const vs = senderFor(pc, "video"), as = senderFor(pc, "audio");
+    if (vs && vs.track !== t) vs.replaceTrack(t).catch(() => {});
+    if (as){ if (as.track !== a) as.replaceTrack(a).catch(() => {}); return; }
+    if (!a) return;
+    // the microphone came on after this call started: call again so it carries sound
+    const k = c.mainCall; c.mainCall = null; try { k.close(); } catch {}
   }
   // a call that never got answered is dropped and tried again
   if (c.mainCall && Date.now() - c.mainCall.startedAt < 15000) return;
   if (c.mainCall){ try { c.mainCall.close(); } catch {} }
-  const call = net.peer.call(c.conn.peer, stream, { metadata: { role: "main" } });
+  const call = net.peer.call(c.conn.peer, new MediaStream(a ? [t, a] : [t]), { metadata: { role: "main", sound: !!a } });
   if (!call) return;
   call.startedAt = Date.now();
   c.mainCall = call;
