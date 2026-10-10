@@ -60,8 +60,13 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .pill{font-family:var(--num);font-weight:700;font-size:14px;letter-spacing:.05em;line-height:1;padding:4px 7px 3px;border-radius:4px;background:var(--scrim);color:#fff;display:inline-flex;gap:5px;align-items:center;font-variant-numeric:tabular-nums;border:0}
 .pill.live{background:var(--live)}
 .pill svg{width:12px;height:12px}
-.flip{position:absolute;right:10px;bottom:10px;width:36px;height:36px;border-radius:50%;border:0;background:var(--scrim);display:grid;place-items:center}
+.tools{position:absolute;right:10px;bottom:10px;display:flex;gap:8px;align-items:center}
+.flip{width:36px;height:36px;border-radius:50%;border:0;background:var(--scrim);display:grid;place-items:center}
 .flip svg{width:18px;height:18px}
+.clipbtn{height:36px;border-radius:18px;border:0;background:var(--scrim);display:inline-flex;gap:6px;align-items:center;padding:0 12px 0 10px;font-family:var(--num);font-weight:700;font-size:16px;letter-spacing:.06em;color:#fff}
+.clipbtn svg{width:18px;height:18px}
+.clipbtn.busy{background:var(--accent)}
+.clipbtn .n{min-width:18px;height:18px;border-radius:9px;background:var(--live);font-size:12px;display:grid;place-items:center;padding:0 4px;letter-spacing:0}
 .offline-card{position:absolute;inset:0;display:grid;place-content:center;gap:10px;text-align:center;background:rgba(8,7,12,.78)}
 .offline-card b{font-family:var(--num);font-size:28px;letter-spacing:.08em}
 .offline-card span{color:var(--muted)}
@@ -137,7 +142,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 .irl .tag{background:var(--glass);color:#fff}
 .irl .iconbtn{background:var(--glass)}
 .irl .avatar.is-live{box-shadow:0 0 0 2px #000,0 0 0 4px var(--live)}
-.irl .flip{top:calc(env(safe-area-inset-top,0px) + 96px);bottom:auto}
+.irl .tools{top:calc(env(safe-area-inset-top,0px) + 96px);bottom:auto}
 .irl .chat{position:relative;z-index:2;flex:none;height:52%;margin-top:auto;background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.5) 40%)}
 .irl .chat-head{display:none}
 .irl .list{-webkit-mask-image:linear-gradient(transparent,#000 20%);mask-image:linear-gradient(transparent,#000 20%)}
@@ -211,7 +216,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <span class="pill live">LIVE</span>
         <button class="pill" data-open-viewers aria-label="Viewer controls"><svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><circle cx="8" cy="5" r="3"/><path d="M2 14c0-3.3 2.7-5 6-5s6 1.7 6 5z"/></svg><span id="vPill">0</span></button>
       </div>
-      <button class="flip ctl" id="flip" aria-label="Switch camera" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M9 13a3 3 0 0 1 5-2.2M15 13a3 3 0 0 1-5 2.2"/><path d="M14 9v2h-2M10 17v-2h2"/></svg></button>
+      <div class="tools">
+        <button class="clipbtn ctl" id="clipBtn" aria-label="Clip the last 30 seconds to your PC folder" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg><span>CLIP</span><span class="n" id="clipCount" hidden>0</span></button>
+        <button class="flip ctl" id="flip" aria-label="Switch camera" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 7h-3l-2-3H9L7 7H4a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h16a1 1 0 0 0 1-1V8a1 1 0 0 0-1-1z"/><path d="M9 13a3 3 0 0 1 5-2.2M15 13a3 3 0 0 1-5 2.2"/><path d="M14 9v2h-2M10 17v-2h2"/></svg></button>
+      </div>
       <div class="offline-card" id="offline" hidden>
         <b>OFFLINE</b>
         <span>The stream has ended.</span>
@@ -259,8 +267,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <div class="chips">
       <button type="button" class="chipbtn" id="toPrefabs">Edit prefabs</button>
       <button type="button" class="chipbtn" id="toViewers">Viewers</button>
-      <button type="button" class="chipbtn" id="toConnect">Connect phones</button>
-    </div>
+      <button type="button" class="chipbtn" id="toConnect">Connect phones</button>    </div>
 
     <h3>Stream</h3>
     <div class="field"><label for="fStreamer">Channel name</label><input id="fStreamer" type="text" maxlength="25" autocapitalize="off"></div>
@@ -342,6 +349,15 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <p class="note">This phone shows the main phone's chat. Anything you type shows up on every phone.</p>
       <label class="check"><input id="jCam2" type="checkbox"> Send my camera to the main phone</label>
       <button type="button" class="btn danger" id="leaveBtn">Leave</button>
+    </div>
+
+    <div id="pcFolder" class="field" style="gap:10px" hidden>
+      <h3>Clip folder on this computer</h3>
+      <p class="note" id="pcFolderNote"></p>
+      <div class="chips">
+        <button type="button" class="chipbtn" id="allowFolder" hidden>Allow saving</button>
+        <button type="button" class="chipbtn" id="pickFolder">Choose folder</button>
+      </div>
     </div>
 
     <h3>Relay for mobile data</h3>
@@ -904,6 +920,7 @@ function renderHeader(){
   $("vStat").hidden = !live.on;
   $("offline").hidden = live.on;
   renderStats(); renderClock(); renderBar(); renderProgress();
+  clipSync();
   pushState();
 }
 
@@ -1023,11 +1040,215 @@ function showMedia(file){
   m.appendChild(el);
 }
 
+/* ================= clips ================= */
+/* CLIP button -> last 30 to 45 seconds (picture + microphone) -> your PC folder.
+   A hidden canvas copies just the stream picture (no chat), at the camera's own shape, and the
+   microphone is added as sound. Recorders on it start every 15s and the oldest is dropped once a
+   newer one covers 30s, so one recorder always holds the last 30 to 45 seconds. CLIP stops that
+   recorder. Each clip waits on this phone (kept even if the app closes) until the PC saves it. */
+const CLIP_MS = 30000, CLIP_STAGGER = 15000;
+const CLIP_TYPES_AV = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
+const CLIP_TYPES_V = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
+const clipSupported = !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
+const clip = { on: false, gen: 0, seq: 0, tall: false, canvas: null, ctx: null, stream: null, mic: null, micWarned: false, mime: "", recs: [], tickT: null, raf: 0, lastDraw: 0, resyncT: null, pending: [] };
+const pad2 = n => String(n).padStart(2, "0");
+const fmtDur = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${pad2(s % 60)}`; };
+
+function clipMime(withSound){
+  try { return (withSound ? CLIP_TYPES_AV : CLIP_TYPES_V).find(t => MediaRecorder.isTypeSupported(t)) || ""; } catch { return ""; }
+}
+
+const vidReady = v => v.readyState >= 2 && v.videoWidth > 0;
+/* what the stage is showing right now: { el, w, h, mirror }, or null for the background scene */
+function clipSource(){
+  const rv = $("remoteCam"), md = $("media"), mel = md.firstChild;
+  if (!rv.hidden && vidReady(rv)) return { el: rv, w: rv.videoWidth, h: rv.videoHeight, mirror: false };
+  if (!cam.hidden && vidReady(cam)) return { el: cam, w: cam.videoWidth, h: cam.videoHeight, mirror: cam.classList.contains("mirror") };
+  if (!md.hidden && mel){
+    if (mel.tagName === "VIDEO") return vidReady(mel) ? { el: mel, w: mel.videoWidth, h: mel.videoHeight, mirror: false } : null;
+    return mel.naturalWidth ? { el: mel, w: mel.naturalWidth, h: mel.naturalHeight, mirror: false } : null;
+  }
+  return null;
+}
+/* clips are upright when the camera picture is upright (or, with no camera, in full-screen layout) */
+function clipWantsTall(){
+  const s = clipSource();
+  return s ? s.h > s.w : cfg.layout === "irl";
+}
+
+/* ---- microphone (sound for clips) ---- */
+async function getMic(){
+  if (clip.mic && clip.mic.getAudioTracks().some(t => t.readyState === "live")) return clip.mic;
+  clip.mic = null;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
+  try { clip.mic = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
+  catch {
+    if (!clip.micWarned){ clip.micWarned = true; toast("Microphone is off, so clips will have no sound"); }
+  }
+  return clip.mic;
+}
+function stopMic(){
+  if (clip.mic){ clip.mic.getTracks().forEach(t => t.stop()); clip.mic = null; }
+}
+
+/* ---- the always-running recording ---- */
+function clipSync(){
+  // a joined phone or PC doesn't record (and shouldn't ask for the microphone)
+  const allowed = clipSupported && cfg.layout !== "chat" && !isFollower() && netCfg.mode !== "follower";
+  $("clipBtn").hidden = !allowed;
+  const want = allowed && !document.hidden, tall = clipWantsTall();
+  if (want && clip.gen && clip.tall === tall) return;
+  clipStop();
+  if (!want){ stopMic(); return; }
+  clipStart(tall);
+}
+function clipStart(tall){
+  const gen = clip.gen = ++clip.seq;
+  clip.tall = tall;
+  if (!clip.canvas){
+    const c = document.createElement("canvas");
+    c.style.cssText = "position:fixed;left:-10px;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
+    c.setAttribute("aria-hidden", "true");
+    document.body.appendChild(c);
+    clip.canvas = c; clip.ctx = c.getContext("2d");
+  }
+  clip.canvas.width = tall ? 720 : 1280;
+  clip.canvas.height = tall ? 1280 : 720;
+  clipFrame();
+  try { clip.stream = clip.canvas.captureStream(30); } catch { return; }
+  clip.mime = clipMime(false);
+  clip.on = true;
+  clip.raf = requestAnimationFrame(clipLoop);
+  clip.tickT = setInterval(clipTick, 500);
+  clipTick();
+  // sound joins as soon as the microphone is ready (recorders started after that have it)
+  getMic().then(mic => {
+    const sound = mic && mic.getAudioTracks()[0];
+    if (!sound || gen !== clip.gen || !clip.stream) return;
+    clip.stream.addTrack(sound);
+    clip.mime = clipMime(true);
+    // restart the recording so clips have sound from now on, not only after the next 15s
+    clip.recs.forEach(dropRec); clip.recs = [];
+    clipTick();
+  });
+}
+function clipStop(){
+  clip.gen = 0; clip.on = false;
+  cancelAnimationFrame(clip.raf); clearInterval(clip.tickT);
+  clip.recs.forEach(dropRec); clip.recs = [];
+  // stop the canvas picture; the microphone stays on for the next start
+  if (clip.stream){ clip.stream.getVideoTracks().forEach(t => t.stop()); clip.stream = null; }
+}
+function startRec(){
+  try {
+    const opts = { videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 };
+    if (clip.mime) opts.mimeType = clip.mime;
+    const r = new MediaRecorder(clip.stream, opts);
+    const rec = { r, chunks: [], start: Date.now(), drop: false, done: null };
+    r.ondataavailable = e => { if (!rec.drop && e.data && e.data.size) rec.chunks.push(e.data); };
+    r.onstop = () => { if (rec.done) rec.done(); };
+    r.start(1000);
+    clip.recs.push(rec);
+  } catch {
+    clipStop();
+    toast("This browser can't record clips");
+  }
+}
+function dropRec(rec){
+  rec.drop = true; rec.chunks = [];
+  try { if (rec.r.state !== "inactive") rec.r.stop(); } catch {}
+}
+function clipTick(){
+  if (!clip.on) return;
+  const now = Date.now(), recs = clip.recs;
+  if (!recs.length || now - recs[recs.length - 1].start >= CLIP_STAGGER) startRec();
+  while (recs.length > 1 && now - recs[1].start >= CLIP_MS) dropRec(recs.shift());
+}
+
+/* ---- CLIP button ---- */
+function takeClip(){
+  if (!clip.on){ toast("Clips are still starting. Try again in a moment."); return; }
+  const rec = clip.recs[0], now = Date.now();
+  if (!rec || now - rec.start < 1500){ toast("Nothing to clip yet"); return; }
+  clip.recs.shift();
+  clipTick();
+  const dur = now - rec.start;
+  $("clipBtn").classList.add("busy");
+  rec.done = () => {
+    $("clipBtn").classList.remove("busy");
+    const type = (rec.r.mimeType || clip.mime || "video/webm").split(";")[0];
+    newClip(new Blob(rec.chunks, { type }), dur);
+  };
+  try { rec.r.requestData(); } catch {}
+  try { rec.r.stop(); } catch { rec.done(); }
+}
+function newClip(blob, dur){
+  if (!blob.size){ toast("That clip came out empty. Try again."); return; }
+  const t = new Date();
+  const ext = blob.type.includes("mp4") ? "mp4" : "webm";
+  const name = `chatline-clip-${t.getFullYear()}${pad2(t.getMonth() + 1)}${pad2(t.getDate())}-${pad2(t.getHours())}${pad2(t.getMinutes())}${pad2(t.getSeconds())}.${ext}`;
+  const it = { id: makeCode() + makeCode(), name, type: blob.type, dur, blob };
+  clip.pending.push(it);
+  kvPutClip(it);
+  renderClipCount();
+  if (sendClipToFolders(it)) toast(`Clipped ${fmtDur(dur)}. Sending to your PC folder…`);
+  else {
+    // the PC can only connect to a room, so make sure this phone has one going
+    if (net.role === "solo") startHost();
+    toast(`Clipped ${fmtDur(dur)}. It goes to your PC folder when the PC connects.`);
+  }
+}
+/* the red number on CLIP = clips waiting to reach the PC folder */
+function renderClipCount(){
+  const n = clip.pending.length;
+  $("clipCount").hidden = !n; $("clipCount").textContent = n;
+}
+$("clipBtn").addEventListener("click", takeClip);
+
+/* ---- drawing the stream picture onto the clip canvas ---- */
+function clipLoop(ts){
+  if (!clip.on) return;
+  clip.raf = requestAnimationFrame(clipLoop);
+  if (ts - clip.lastDraw < 30) return;
+  clip.lastDraw = ts;
+  clipFrame();
+}
+function coverDraw(src, sw, sh, mirror){
+  if (!sw || !sh) return false;
+  const x = clip.ctx, W = clip.canvas.width, H = clip.canvas.height;
+  const s = Math.max(W / sw, H / sh), dw = sw * s, dh = sh * s;
+  x.save();
+  if (mirror){ x.translate(W, 0); x.scale(-1, 1); }
+  try { x.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh); } catch { x.restore(); return false; }
+  x.restore();
+  return true;
+}
+function clipFrame(){
+  const x = clip.ctx, W = clip.canvas.width, H = clip.canvas.height;
+  x.fillStyle = "#000"; x.fillRect(0, 0, W, H);
+  const s = clipSource();
+  if (!s || !coverDraw(s.el, s.w, s.h, s.mirror)) drawScene(x, W, H);
+  // camera turned or source changed shape: restart the recorders at the new shape
+  if (clip.on && clipWantsTall() !== clip.tall && !clip.resyncT){
+    clip.resyncT = setTimeout(() => { clip.resyncT = null; clipSync(); }, 1000);
+  }
+}
+function drawScene(x, W, H){
+  x.fillStyle = "#120f1c"; x.fillRect(0, 0, W, H);
+  const d = Math.sin(Date.now() / 7000) * 0.04, m = Math.max(W, H);
+  [[.25 + d, .35, .5, "rgba(168,115,255,.55)"], [.75 - d, .65, .45, "rgba(255,92,138,.35)"], [.6, .2 + d, .6, "rgba(60,170,255,.25)"]].forEach(([cx, cy, r, c]) => {
+    const g = x.createRadialGradient(cx * W, cy * H, 0, cx * W, cy * H, r * m);
+    g.addColorStop(0, c); g.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = g; x.fillRect(0, 0, W, H);
+  });
+}
+
 /* keep the screen awake and the camera running */
 let wake = null;
 async function keepAwake(){ try { if ("wakeLock" in navigator && !wake) { wake = await navigator.wakeLock.request("screen"); wake.addEventListener("release", () => { wake = null; }); } } catch {} }
 document.addEventListener("pointerdown", keepAwake, { once: true });
 document.addEventListener("visibilitychange", () => {
+  clipSync();
   if (document.hidden) return;
   keepAwake();
   const isCam = cfg.layout !== "chat" && (cfg.source === "back" || cfg.source === "front");
@@ -1070,8 +1291,7 @@ function openSettings(){
   $("fEvents").checked = cfg.events;
   $("fReacts").value = cfg.reacts;
   $("fNames").value = cfg.names;
-  radio("fLayout", cfg.layout); radio("fSource", cfg.source);
-  const s = Math.floor((Date.now() - live.startedAt) / 1000);
+  radio("fLayout", cfg.layout); radio("fSource", cfg.source);  const s =Math.floor((Date.now() - live.startedAt) / 1000);
   $("fUptime").value = live.on ? `${Math.floor(s / 3600)}:${String(Math.floor(s / 60) % 60).padStart(2, "0")}` : "";
   $("fUptime").dataset.orig = $("fUptime").value;
   $("fUptime").disabled = !live.on;
@@ -1305,7 +1525,7 @@ function openHostPeer(){
   p.on("open", () => { if (net.peer === p) setNetStatus(net.conns.size ? "Room is on" : "Room is on. Waiting for phones…"); });
   p.on("connection", conn => {
     conn.on("open", () => {
-      net.conns.set(conn.peer, { conn, cam: false });
+      net.conns.set(conn.peer, { conn, cam: false, clips: false });
       try { conn.send({ t: "hello", hist: net.history.slice(-30), state: hostState() }); } catch {}
       setNetStatus("Room is on");
       toast("A phone connected");
@@ -1340,6 +1560,147 @@ function onHostData(conn, d){
   } else if (d.t === "cam"){
     const c = net.conns.get(conn.peer);
     if (c){ c.cam = !!d.on; renderNet(); }
+  } else if (d.t === "clipdir"){
+    const c = net.conns.get(conn.peer);
+    if (c){
+      const was = c.clips;
+      c.clips = !!d.on; renderNet();
+      if (c.clips){
+        if (!was) toast("PC clip folder connected");
+        // clips taken while the PC wasn't ready go now, oldest first (again, if the PC wasn't able to save them)
+        clip.pending.forEach(it => { if (!was && it.sentTo) it.sentTo.delete(c.conn); sendClip(c, it); });
+      }
+    }
+  } else if (d.t === "clipsaved"){
+    const id = String(d.id || "");
+    if (clip.pending.some(it => it.id === id)){
+      clip.pending = clip.pending.filter(it => it.id !== id);
+      kvDelClip(id);
+      renderClipCount();
+      toast("Clip saved to your PC folder");
+    }
+  }
+}
+
+/* ---- clips to a folder on a PC ----
+   The PC joins this phone's room and picks a folder once. The phone sends each clip in pieces,
+   the PC writes the file into the folder and says so, and only then does the phone forget it. */
+const CLIP_PART = 256 * 1024;
+function sendClipToFolders(it){
+  if (net.role !== "host") return false;
+  let any = false;
+  for (const c of net.conns.values()) if (c.clips && c.conn.open){ sendClip(c, it); any = true; }
+  return any;
+}
+async function sendClip(c, it){
+  // once per connection; a reconnected PC is a new connection and gets it again
+  if (!it.sentTo) it.sentTo = new WeakSet();
+  if (it.sentTo.has(c.conn)) return;
+  it.sentTo.add(c.conn);
+  try {
+    const buf = await it.blob.arrayBuffer();
+    const n = Math.max(1, Math.ceil(buf.byteLength / CLIP_PART));
+    for (let i = 0; i < n; i++){
+      c.conn.send({ t: "clippart", id: it.id, name: it.name, type: it.type, i, n, data: buf.slice(i * CLIP_PART, (i + 1) * CLIP_PART) });
+    }
+  } catch {
+    it.sentTo.delete(c.conn);
+    toast("Couldn't send the clip to your PC");
+  }
+}
+
+/* small on-device storage: the PC's chosen folder ("kv") and the phone's clips waiting for the PC ("clips") */
+const folderSupported = "showDirectoryPicker" in window;
+const pcDir = { handle: null, ok: false, parts: new Map() };
+function kvDB(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("chatline", 2);
+    r.onupgradeneeded = () => {
+      const db = r.result;
+      if (!db.objectStoreNames.contains("kv")) db.createObjectStore("kv");
+      if (!db.objectStoreNames.contains("clips")) db.createObjectStore("clips", { keyPath: "id" });
+    };
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function kvGet(k){
+  try { const db = await kvDB(); return await new Promise(res => { const q = db.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); }
+  catch { return null; }
+}
+async function kvSet(k, v){ try { const db = await kvDB(); db.transaction("kv", "readwrite").objectStore("kv").put(v, k); } catch {} }
+async function kvPutClip(it){
+  try {
+    const db = await kvDB();
+    db.transaction("clips", "readwrite").objectStore("clips").put({ id: it.id, name: it.name, type: it.type, dur: it.dur, blob: it.blob });
+  } catch {}
+}
+async function kvDelClip(id){ try { const db = await kvDB(); db.transaction("clips", "readwrite").objectStore("clips").delete(id); } catch {} }
+async function kvAllClips(){
+  try { const db = await kvDB(); return await new Promise(res => { const q = db.transaction("clips").objectStore("clips").getAll(); q.onsuccess = () => res(q.result || []); q.onerror = () => res([]); }); }
+  catch { return []; }
+}
+
+async function folderCheck(ask){
+  let ok = false;
+  if (pcDir.handle){
+    try {
+      let p = await pcDir.handle.queryPermission({ mode: "readwrite" });
+      if (p !== "granted" && ask) p = await pcDir.handle.requestPermission({ mode: "readwrite" });
+      ok = p === "granted";
+    } catch {}
+  }
+  pcDir.ok = ok;
+  renderFolder(); tellHostFolder();
+  return ok;
+}
+function tellHostFolder(){
+  if (isFollower() && net.hostConn && net.hostConn.open){ try { net.hostConn.send({ t: "clipdir", on: pcDir.ok }); } catch {} }
+}
+function renderFolder(){
+  $("pcFolder").hidden = !folderSupported;
+  if (!folderSupported) return;
+  const h = pcDir.handle;
+  $("pcFolderNote").textContent = !h ? "Pick a folder and every clip the phone takes gets saved into it. Join the phone's room on this PC too."
+    : !pcDir.ok ? `Saving to "${h.name}" needs your OK again after the page reloads. Tap Allow saving.`
+    : isFollower() ? `Clips from the phone are saved into "${h.name}".`
+    : `Clips will be saved into "${h.name}". Join the phone's room above to start getting them.`;
+  $("allowFolder").hidden = !h || pcDir.ok;
+  $("pickFolder").textContent = h ? "Change folder" : "Choose folder";
+}
+$("pickFolder").addEventListener("click", async () => {
+  try {
+    const h = await window.showDirectoryPicker({ id: "chatline-clips", mode: "readwrite", startIn: "videos" });
+    pcDir.handle = h; kvSet("clipDir", h);
+    if (await folderCheck(true)) toast(`Clips will be saved into "${h.name}"`);
+  } catch (err) { if (!err || err.name !== "AbortError") toast("Couldn't use that folder. Try another one."); }
+});
+$("allowFolder").addEventListener("click", () => folderCheck(true));
+
+function pcReceive(d){
+  const id = String(d.id || "");
+  const bin = d.data instanceof ArrayBuffer || ArrayBuffer.isView(d.data) || d.data instanceof Blob;
+  if (!id || !bin) return;
+  let e = pcDir.parts.get(id);
+  if (!e){ e = { parts: [], got: 0, n: +d.n || 1 }; pcDir.parts.set(id, e); }
+  if (!e.parts[d.i]){ e.parts[d.i] = d.data; e.got++; }
+  if (e.got < e.n) return;
+  pcDir.parts.delete(id);
+  const name = String(d.name || "clip.mp4").replace(/[\\/:*?"<>|]/g, "_");
+  pcSave(id, name, new Blob(e.parts, { type: String(d.type || "video/mp4") }));
+}
+async function pcSave(id, name, blob){
+  if (!pcDir.ok && !(await folderCheck(false))){
+    toast("A clip came in. Tap Allow saving in Connect phones, and the phone will send it again.");
+    return;
+  }
+  try {
+    const fh = await pcDir.handle.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(blob); await w.close();
+    toast(`Saved ${name} to "${pcDir.handle.name}"`);
+    try { net.hostConn.send({ t: "clipsaved", id }); } catch {}
+  } catch {
+    toast("Couldn't write the clip into your folder. Try Allow saving or pick the folder again.");
   }
 }
 function setRemoteCam(s, call){
@@ -1409,6 +1770,7 @@ function connectToHost(){
   conn.on("open", () => {
     clearTimeout(timer);
     setNetStatus("Synced with the main phone");
+    tellHostFolder();
     if (netCfg.sendCam) startSendCam();
   });
   conn.on("data", onFollowerData);
@@ -1421,6 +1783,7 @@ function onFollowerData(d){
     (Array.isArray(d.hist) ? d.hist : []).forEach(showRemote);
     if (d.state) applyHostState(d.state);
   } else if (d.t === "state") applyHostState(d);
+  else if (d.t === "clippart") pcReceive(d);
   else showRemote(d);
 }
 function showRemote(m){
@@ -1513,8 +1876,9 @@ function renderNet(){
   $("netStatus").textContent = net.status || (r === "solo" ? "Not connected" : "");
   if (r === "host"){
     const n = net.conns.size, c = [...net.conns.values()].filter(x => x.cam).length;
+    const f = [...net.conns.values()].some(x => x.clips);
     $("netPeers").textContent = n
-      ? `${n} phone${n > 1 ? "s" : ""} connected${c ? ` · ${c} sending a camera` : ""}${net.remote ? " · friend's camera is coming through" : ""}`
+      ? `${n} phone${n > 1 ? "s" : ""} connected${c ? ` · ${c} sending a camera` : ""}${net.remote ? " · friend's camera is coming through" : ""}${f ? " · computer clip folder connected" : ""}`
       : "No phones connected yet.";
   } else $("netPeers").textContent = "";
   $("jCam2").checked = !!netCfg.sendCam;
@@ -1528,7 +1892,7 @@ function openNet(){
   $("rServer").value = netCfg.relayServer || "";
   $("rUser").value = netCfg.relayUser || "";
   $("rPass").value = netCfg.relayPass || "";
-  renderNet();
+  renderNet(); renderFolder();
   openSheet("netWrap");
 }
 $("hostStart").addEventListener("click", startHost);
@@ -1573,6 +1937,14 @@ $("netForm").addEventListener("submit", e => {
 parseAll();
 renderHeader();
 renderNet();
+/* clips from earlier that haven't reached the PC folder yet */
+kvAllClips().then(saved => {
+  const have = new Set(clip.pending.map(it => it.id));
+  clip.pending = saved.filter(it => it && it.blob && !have.has(it.id)).concat(clip.pending);
+  renderClipCount();
+  clip.pending.forEach(it => sendClipToFolders(it));
+});
+if (folderSupported) kvGet("clipDir").then(h => { if (h){ pcDir.handle = h; folderCheck(false); } });
 if (netCfg.mode === "follower" && netCfg.joinCode){
   joinRoom(netCfg.joinCode);
 } else {
