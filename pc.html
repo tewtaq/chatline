@@ -33,7 +33,7 @@ html,body{margin:0;min-height:100%}
 body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--ui);display:flex;justify-content:center;padding:40px 16px}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-main{width:100%;max-width:480px;display:grid;gap:20px;align-content:start}
+main{width:100%;max-width:560px;display:grid;gap:20px;align-content:start}
 header{display:flex;gap:12px;align-items:center}
 header img{width:44px;height:44px;border-radius:10px}
 h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em}
@@ -68,6 +68,12 @@ li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
 .empty{color:var(--muted);font-size:14px}
 .note{color:var(--muted);font-size:13px;margin:0}
+.camwrap{display:grid;gap:10px}
+.camhead{display:flex;justify-content:space-between;align-items:center}
+.camhead .btn{padding:6px 12px;font-size:13px}
+.cam{position:relative;background:#000;border-radius:10px;overflow:hidden;aspect-ratio:16/9;display:grid;place-items:center}
+.cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
+.cammsg{position:relative;margin:0;padding:16px;text-align:center;color:var(--muted);font-size:14px}
 .unsupported{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
 </style>
 </head>
@@ -105,6 +111,17 @@ li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-num
 
   <div class="status" id="status" role="status" aria-live="polite"><span class="dot"></span><span id="statusText">Starting…</span></div>
 
+  <section class="camwrap" id="camWrap" hidden>
+    <div class="camhead">
+      <h2>Phone camera</h2>
+      <button type="button" class="btn ghost" id="camToggle">Hide</button>
+    </div>
+    <div class="cam" id="camBox">
+      <video id="phoneCam" playsinline autoplay muted></video>
+      <p class="cammsg" id="camMsg"></p>
+    </div>
+  </section>
+
   <section style="display:grid;gap:10px">
     <h2>Saved this session</h2>
     <ul id="saved"></ul>
@@ -137,9 +154,11 @@ function iceConfig(){
 const st = {
   code: "", dir: null, ok: false,
   peer: null, conn: null, retryT: null, noPhone: false, failed: "",
-  parts: new Map(), recv: null
+  parts: new Map(), recv: null,
+  watch: true, call: null, live: false
 };
 try { st.code = normCode(localStorage.getItem("chatlinePC.code")); } catch {}
+try { st.watch = localStorage.getItem("chatlinePC.watch") !== "off"; } catch {}
 
 /* ---- remembering the folder (browsers keep folder access in IndexedDB) ---- */
 function db(){
@@ -186,6 +205,21 @@ function connect(){
     const p = new Peer({ config: iceConfig(), debug: 0 });
     st.peer = p;
     p.on("open", () => { if (st.peer === p) openConn(); });
+    // the phone's camera, sent while this page asks for it
+    p.on("call", call => {
+      if (!call.metadata || call.metadata.role !== "main"){ try { call.close(); } catch {} return; }
+      if (st.call && st.call !== call){ try { st.call.close(); } catch {} }
+      st.call = call; st.live = false;
+      call.answer();
+      call.on("stream", s => {
+        if (st.call !== call) return;
+        const v = $("phoneCam");
+        v.srcObject = s; v.play().catch(() => {});
+        st.live = true; render();
+      });
+      const end = () => { if (st.call === call) dropCall(); };
+      call.on("close", end); call.on("error", end);
+    });
     p.on("disconnected", () => setTimeout(() => {
       if (st.peer === p && !p.destroyed && p.disconnected){ try { p.reconnect(); } catch {} }
     }, 2000));
@@ -207,6 +241,13 @@ function connect(){
 function dropConn(){
   const c = st.conn; st.conn = null;
   if (c){ try { c.close(); } catch {} }
+  dropCall();
+}
+function dropCall(){
+  const k = st.call; st.call = null; st.live = false;
+  $("phoneCam").srcObject = null;
+  if (k){ try { k.close(); } catch {} }
+  render();
 }
 function openConn(){
   clearTimeout(st.retryT);
@@ -220,6 +261,7 @@ function openConn(){
     if (st.conn !== c) return;
     st.conn = null;
     try { c.close(); } catch {}
+    dropCall();
     st.recv = null;
     st.retryT = setTimeout(openConn, 4000);
     render();
@@ -230,8 +272,14 @@ function openConn(){
   render();
 }
 const linked = () => !!(st.conn && st.conn.open);
-/* tell the phone whether clips can be saved here; it sends waiting clips as soon as this is on */
-function tell(){ if (linked()){ try { st.conn.send({ t: "clipdir", on: st.ok }); } catch {} } }
+/* tell the phone whether clips can be saved here (it sends waiting clips as soon as this is on)
+   and whether to show its camera (only while this page is on screen) */
+function tell(){
+  if (!linked()) return;
+  try { st.conn.send({ t: "clipdir", on: st.ok }); } catch {}
+  try { st.conn.send({ t: "watch", on: st.watch && !document.hidden }); } catch {}
+  if (!st.watch || document.hidden) dropCall();
+}
 
 /* ---- receiving and saving clips ---- */
 function onData(d){
@@ -280,7 +328,15 @@ function setStatus(kind, text){
   $("statusText").textContent = text;
   document.title = (kind === "ready" ? "● " : "") + "Chatline Clip Folder";
 }
+function renderCam(){
+  $("camWrap").hidden = !linked();
+  $("camToggle").textContent = st.watch ? "Hide" : "Show";
+  $("camBox").hidden = !st.watch;
+  $("camMsg").hidden = st.live;
+  $("camMsg").textContent = "Waiting for your phone's camera. It shows while Chatline on your phone has its camera on.";
+}
 function render(){
+  renderCam();
   $("step1").classList.toggle("done", st.code.length >= 4);
   $("step2").classList.toggle("done", !!st.dir && st.ok);
   $("pick").hidden = !!st.dir;
@@ -323,6 +379,11 @@ codeIn.addEventListener("keydown", e => { if (e.key === "Enter") codeChanged(); 
 $("pick").addEventListener("click", pickFolder);
 $("change").addEventListener("click", pickFolder);
 $("allow").addEventListener("click", () => checkFolder(true));
+$("camToggle").addEventListener("click", () => {
+  st.watch = !st.watch;
+  try { localStorage.setItem("chatlinePC.watch", st.watch ? "on" : "off"); } catch {}
+  tell(); render();
+});
 
 /* come back after sleep, lost internet or a phone restart */
 function wake(){
@@ -332,7 +393,7 @@ function wake(){
   else if (!st.conn && st.peer.open) openConn();
 }
 window.addEventListener("online", wake);
-document.addEventListener("visibilitychange", () => { if (!document.hidden) wake(); });
+document.addEventListener("visibilitychange", () => { tell(); if (!document.hidden) wake(); });
 setInterval(wake, 15000);
 
 render();
