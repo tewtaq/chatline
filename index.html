@@ -123,6 +123,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 
 .clean .ctl{display:none!important}
 
+/* ---- chat-only layout: no video, just the top bar and chat ---- */
+.chatonly .stage{display:none}
+
 /* ---- full-screen camera layout ---- */
 .app.irl{padding-top:0}
 .irl .stage{position:fixed;inset:0;aspect-ratio:auto;z-index:0}
@@ -148,9 +151,9 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 
 /* wide screens / landscape (Twitch layout): video left, chat right */
 @media (min-width:820px), (orientation:landscape) and (min-width:600px){
-  .app:not(.irl){flex-direction:row}
-  .app:not(.irl) .watch{flex:1;min-width:0;overflow-y:auto}
-  .app:not(.irl) .chat{flex:none;width:340px;border-left:1px solid var(--line)}
+  .app:not(.irl):not(.chatonly){flex-direction:row}
+  .app:not(.irl):not(.chatonly) .watch{flex:1;min-width:0;overflow-y:auto}
+  .app:not(.irl):not(.chatonly) .chat{flex:none;width:340px;border-left:1px solid var(--line)}
 }
 
 /* ---- sheets ---- */
@@ -269,7 +272,9 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <div class="chips">
         <label class="chip"><input type="radio" name="fLayout" value="twitch"><span>Video on top</span></label>
         <label class="chip"><input type="radio" name="fLayout" value="irl"><span>Full-screen camera</span></label>
+        <label class="chip"><input type="radio" name="fLayout" value="chat"><span>Chat only</span></label>
       </div>
+      <small>Chat only hides the video and turns the camera off.</small>
     </div>
     <div class="field">
       <span class="lbl">Stream picture</span>
@@ -288,7 +293,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <h3>Chat</h3>
     <div class="field"><label for="fReacts">Replies when you chat</label><textarea id="fReacts" style="min-height:100px"></textarea><small>Viewers pick from these right after you send a message. One per line.</small></div>
     <div class="field"><label for="fNames">Chatter names</label><textarea id="fNames"></textarea><small>One per line.</small></div>
-    <p class="note">Double-tap the video to hide or show the buttons. Hold a number button to edit that prefab.</p>
+    <p class="note">Double-tap the video (or the top bar in chat only) to hide or show the buttons. Hold a number button to edit that prefab.</p>
 
     <div class="sheet-actions">
       <button type="button" class="btn danger" id="toggleLive">End stream</button>
@@ -805,6 +810,7 @@ setInterval(renderClock, 1000);
 
 function renderHeader(){
   $("app").classList.toggle("irl", cfg.layout === "irl");
+  $("app").classList.toggle("chatonly", cfg.layout === "chat");
   $("sName").textContent = cfg.streamer;
   $("avatar").textContent = (cfg.streamer[0] || "?").toUpperCase();
   $("avatar").classList.toggle("is-live", live.on);
@@ -878,6 +884,7 @@ async function startCam(facing){
   }
 }
 async function applySource(){
+  if (cfg.layout === "chat"){ stopCam(); hideMsg(); $("flip").hidden = true; return; }
   const src = cfg.source, isCam = src === "back" || src === "front";
   $("flip").hidden = !isCam;
   $("media").hidden = src !== "media";
@@ -911,21 +918,24 @@ document.addEventListener("pointerdown", keepAwake, { once: true });
 document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
   keepAwake();
-  const isCam = cfg.source === "back" || cfg.source === "front";
+  const isCam = cfg.layout !== "chat" && (cfg.source === "back" || cfg.source === "front");
   if (isCam && (!stream || stream.getVideoTracks().every(t => t.readyState === "ended"))) applySource();
 });
 
-/* double-tap the video to hide/show the buttons */
+/* double-tap the video (or the top bar) to hide/show the buttons */
 let lastTap = 0;
-$("stage").addEventListener("click", e => {
+function onDoubleTap(e){
   if (e.target.closest("button")) return;
   const t = Date.now();
   if (t - lastTap < 320){
     lastTap = 0;
     const clean = $("app").classList.toggle("clean");
-    toast(clean ? "Buttons hidden. Double-tap the video to bring them back." : "Buttons shown");
+    const where = cfg.layout === "chat" ? "the top bar" : "the video";
+    toast(clean ? `Buttons hidden. Double-tap ${where} to bring them back.` : "Buttons shown");
   } else lastTap = t;
-});
+}
+$("stage").addEventListener("click", onDoubleTap);
+document.querySelector(".strip").addEventListener("click", onDoubleTap);
 
 /* ================= sheets ================= */
 function openSheet(id){ document.querySelectorAll(".sheet-wrap").forEach(w => { w.hidden = w.id !== id; }); }
@@ -967,7 +977,7 @@ $("fMedia").addEventListener("change", e => {
 });
 $("settings").addEventListener("submit", e => {
   e.preventDefault();
-  const oldSource = cfg.source;
+  const oldSource = cfg.source, oldLayout = cfg.layout;
   Object.assign(cfg, {
     streamer: $("fStreamer").value.trim() || CFG_DEFAULTS.streamer,
     title: $("fTitle").value.trim(),
@@ -990,7 +1000,7 @@ $("settings").addEventListener("submit", e => {
     }
   }
   closeSheets(); renderHeader(); scheduleEvents();
-  if (cfg.source !== oldSource || cfg.source === "media") applySource();
+  if (cfg.source !== oldSource || cfg.layout !== oldLayout || cfg.source === "media") applySource();
 });
 
 /* ---- prefab editor ---- */
