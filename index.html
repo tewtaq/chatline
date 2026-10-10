@@ -190,6 +190,10 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .filebtn input{position:absolute;opacity:0;width:1px;height:1px}
 
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:20;background:var(--scrim);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
+/* ---- connected phones ---- */
+.follower .prefabs,.follower .climb,.follower #toggleLive{display:none!important}
+.netbadge{margin-left:8px;color:var(--ok);letter-spacing:.04em}
+.bignum b.code{color:var(--fg);letter-spacing:.12em}
 @media (prefers-reduced-motion:reduce){.scene{animation:none}}
 </style>
 </head>
@@ -200,6 +204,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <div class="stage" id="stage">
       <div class="scene" id="scene"></div>
       <video id="cam" playsinline autoplay muted hidden></video>
+      <video id="remoteCam" playsinline autoplay muted hidden></video>
       <div id="media" hidden></div>
       <div class="stage-msg" id="stageMsg" hidden><span id="stageMsgText"></span><button class="btn" id="camRetry" hidden>Start camera</button></div>
       <div class="badges">
@@ -231,7 +236,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
   </div>
 
   <section class="chat" aria-label="Stream chat">
-    <div class="chat-head"><span>Stream chat</span><span id="modeLbl"></span></div>
+    <div class="chat-head"><span>Stream chat<span class="netbadge" id="netBadge"></span></span><span id="modeLbl"></span></div>
     <div class="listwrap">
       <div class="list" id="list"></div>
       <button class="paused" id="paused" hidden>Chat paused due to scroll <svg width="12" height="12" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true"><path d="M8 12 2 6h12z"/></svg></button>
@@ -254,6 +259,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <div class="chips">
       <button type="button" class="chipbtn" id="toPrefabs">Edit prefabs</button>
       <button type="button" class="chipbtn" id="toViewers">Viewers</button>
+      <button type="button" class="chipbtn" id="toConnect">Connect phones</button>
     </div>
 
     <h3>Stream</h3>
@@ -283,6 +289,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
         <label class="chip"><input type="radio" name="fSource" value="front"><span>Front camera</span></label>
         <label class="chip"><input type="radio" name="fSource" value="media"><span>Photo or video</span></label>
         <label class="chip"><input type="radio" name="fSource" value="scene"><span>Background</span></label>
+        <label class="chip"><input type="radio" name="fSource" value="remote"><span>Friend's camera</span></label>
       </div>
       <div style="display:flex;gap:8px;flex-wrap:wrap">
         <label class="filebtn">Choose photo or video<input id="fMedia" type="file" accept="image/*,video/*"></label>
@@ -299,6 +306,54 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <button type="button" class="btn danger" id="toggleLive">End stream</button>
       <button type="button" class="btn ghost" data-close>Cancel</button>
       <button type="submit" class="btn">Save</button>
+    </div>
+  </form>
+</div>
+
+<!-- Connect phones -->
+<div class="sheet-wrap" id="netWrap" hidden>
+  <form class="sheet" id="netForm">
+    <h2>Connect phones</h2>
+    <div class="bignum"><b class="code" id="netCode">—</b><small id="netStatus">Not connected</small></div>
+    <p class="note" id="netPeers"></p>
+
+    <div id="netSolo" class="field" style="gap:14px">
+      <h3>Main phone</h3>
+      <p class="note">Start a room on the phone that controls the chat. Other phones join with the code it shows.</p>
+      <button type="button" class="btn" id="hostStart">Start room</button>
+
+      <h3>Join a main phone</h3>
+      <div class="field"><label for="jCode">Room code</label><input id="jCode" type="text" autocapitalize="characters" autocomplete="off" autocorrect="off" maxlength="8" placeholder="K7QX2M"></div>
+      <div class="field"><label for="jName">Your chat name</label><input id="jName" type="text" maxlength="25" autocapitalize="off" autocorrect="off" placeholder="Shows when you type in chat"></div>
+      <label class="check"><input id="jCam" type="checkbox"> Send my camera to the main phone</label>
+      <button type="button" class="btn" id="joinBtn">Join</button>
+    </div>
+
+    <div id="netHosting" class="field" style="gap:14px" hidden>
+      <p class="note">On the other phone: open Chatline, tap the sliders button, then Connect phones. Type this code and tap Join.</p>
+      <div class="chips">
+        <button type="button" class="chipbtn" id="copyLink">Copy invite link</button>
+        <button type="button" class="chipbtn" id="newCode">New code</button>
+      </div>
+      <button type="button" class="btn danger" id="hostStop">Stop room</button>
+    </div>
+
+    <div id="netJoined" class="field" style="gap:14px" hidden>
+      <p class="note">This phone shows the main phone's chat. Anything you type shows up on every phone.</p>
+      <label class="check"><input id="jCam2" type="checkbox"> Send my camera to the main phone</label>
+      <button type="button" class="btn danger" id="leaveBtn">Leave</button>
+    </div>
+
+    <h3>Relay for mobile data</h3>
+    <p class="note">Phones on mobile data in different places usually need a relay to connect. Make a free account at expressturn.com and copy the server, username and password from its dashboard. Put it on the main phone first. If a phone still can't connect, add it on that phone too.</p>
+    <div class="field"><label for="rServer">Relay server</label><input id="rServer" type="text" autocapitalize="off" autocomplete="off" autocorrect="off" placeholder="relay1.expressturn.com:3478"></div>
+    <div class="row2">
+      <div class="field"><label for="rUser">Username</label><input id="rUser" type="text" autocapitalize="off" autocomplete="off" autocorrect="off"></div>
+      <div class="field"><label for="rPass">Password</label><input id="rPass" type="password" autocomplete="off"></div>
+    </div>
+    <div class="sheet-actions">
+      <button type="button" class="btn ghost" data-close>Close</button>
+      <button type="submit" class="btn">Save relay</button>
     </div>
   </form>
 </div>
@@ -366,6 +421,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <script>
 (() => {
 "use strict";
@@ -563,7 +619,14 @@ let live = store.get("chatline2.live") || { on: true, startedAt: Date.now() };
 const vs = { now: vset.target, from: vset.target, climbStart: 0, climbMs: 0 };
 let mode = "7", modeEnds = 0, modeDur = 0;
 let names = [], reacts = [], pl = {};
-let paused = false, wave = null, chatT, eventT, mediaURL = null, stream = null;
+let paused = false, wave = null, chatT, eventT, mediaURL = null, stream = null, camFacing = null;
+
+/* connected phones: "solo" (on its own), "host" (main phone) or "follower" (mirrors the main phone) */
+const net = { role: "solo", peer: null, conns: new Map(), hostConn: null, camCall: null, remote: null, retryT: null, joinT: null, status: "", history: [], hostView: null };
+let netCfg = Object.assign({ mode: "solo", hostCode: "", joinCode: "", name: "", sendCam: false, relayServer: "", relayUser: "", relayPass: "" }, store.get("chatline2.net") || {});
+const saveNet = () => store.set("chatline2.net", netCfg);
+const isFollower = () => net.role === "follower";
+const isSending = () => isFollower() && netCfg.sendCam;
 
 function loadPrefabs(){
   const saved = store.get("chatline2.prefabs") || {};
@@ -633,7 +696,15 @@ function push(el){
     list.scrollTop = list.scrollHeight;
   }
 }
-function chatLine(name, text, self){
+/* every line the main phone shows is remembered and sent to connected phones */
+function relay(m, fromNet){
+  if (fromNet) return;
+  net.history.push(m);
+  if (net.history.length > 40) net.history.shift();
+  if (net.role === "host") broadcast(m);
+}
+function chatLine(name, text, self, fromNet){
+  relay({ t: "chat", n: name, x: text, s: !!self }, fromNet);
   const el = document.createElement("div");
   el.className = "msg" + (self ? " self" : "");
   el.insertAdjacentHTML("beforeend", self ? BADGE.broadcaster : badgesFor(name));
@@ -645,14 +716,16 @@ function chatLine(name, text, self){
   el.appendChild(document.createTextNode(": " + text));
   push(el);
 }
-function eventLine(lead, sub, kind){
+function eventLine(lead, sub, kind, fromNet){
+  relay({ t: "ev", l: lead, u: sub || "", k: kind || "" }, fromNet);
   const el = document.createElement("div");
   el.className = "msg event" + (kind ? " " + kind : "");
   const l = document.createElement("span"); l.className = "lead"; l.textContent = lead; el.appendChild(l);
   if (sub){ const s = document.createElement("span"); s.className = "sub"; s.textContent = sub; el.appendChild(s); }
   push(el);
 }
-function systemLine(text){
+function systemLine(text, fromNet){
+  relay({ t: "sys", x: text }, fromNet);
   const el = document.createElement("div"); el.className = "msg system"; el.textContent = text; push(el);
 }
 list.addEventListener("scroll", () => { paused = !atBottom(); $("paused").hidden = !paused; }, { passive: true });
@@ -684,7 +757,7 @@ function emit(){
 }
 function scheduleChat(){
   clearTimeout(chatT);
-  if (!live.on) return;
+  if (!live.on || isFollower()) return;
   let rate = Math.max(1, +prefabs[mode].rate || 40);
   if (mode === "7" && wave) rate *= 3;
   const mean = 60000 / rate;
@@ -709,7 +782,7 @@ function fireEvent(){
 }
 function scheduleEvents(){
   clearTimeout(eventT);
-  if (!live.on || !cfg.events) return;
+  if (!live.on || !cfg.events || isFollower()) return;
   eventT = setTimeout(() => { fireEvent(); scheduleEvents(); }, rint(25000, 90000));
 }
 
@@ -734,6 +807,7 @@ function setMode(k){
   modeEnds = modeDur ? Date.now() + modeDur : 0;
   wave = null;
   renderBar();
+  pushState();
   if (live.on){ emit(); scheduleChat(); }
 }
 function renderBar(){
@@ -746,6 +820,11 @@ function renderBar(){
 }
 function renderProgress(){
   const now = Date.now();
+  if (isFollower()){
+    const h = net.hostView;
+    $("modeLbl").textContent = h && h.on && h.ends > now ? `${h.mode} · ${h.name} · ${Math.ceil((h.ends - now) / 1000)}s` : "";
+    return;
+  }
   if (modeEnds && now >= modeEnds) setMode("7");
   bar.querySelectorAll(".pf[data-k]").forEach(b => {
     b.querySelector(".bar").style.width = (b.dataset.k === mode && modeDur) ? clamp((modeEnds - now) / modeDur * 100, 0, 100) + "%" : "0";
@@ -763,7 +842,7 @@ const WOB = { low: .006, med: .018, high: .045 };
 const isClimbing = () => vs.climbMs > 0 && Date.now() - vs.climbStart < vs.climbMs;
 function saveViewers(){ store.set("chatline2.viewers", vset); }
 function viewerTick(){
-  if (!live.on) return;
+  if (!live.on || isFollower()) return;
   const t = vset.target, w = WOB[vset.wobble] || WOB.med;
   const el = Date.now() - vs.climbStart;
   if (vs.climbMs && el < vs.climbMs){
@@ -776,6 +855,7 @@ function viewerTick(){
   }
   vs.now = Math.max(0, vs.now);
   renderStats();
+  pushState();
 }
 setInterval(viewerTick, 2000);
 function startClimb(to, sec){
@@ -825,6 +905,7 @@ function renderHeader(){
   $("vStat").hidden = !live.on;
   $("offline").hidden = live.on;
   renderStats(); renderClock(); renderBar(); renderProgress();
+  pushState();
 }
 
 /* ================= live control ================= */
@@ -850,6 +931,12 @@ $("compose").addEventListener("submit", e => {
   e.preventDefault();
   const text = $("say").value.trim();
   if (!text) return;
+  if (isFollower()){
+    if (!net.hostConn || !net.hostConn.open){ toast("Not connected to the main phone yet"); return; }
+    net.hostConn.send({ t: "say", name: netCfg.name || "viewer", text });
+    $("say").value = "";
+    return;
+  }
   chatLine(cfg.streamer, text, true);
   $("say").value = "";
   paused = false; $("paused").hidden = true; list.scrollTop = list.scrollHeight;
@@ -862,36 +949,62 @@ $("compose").addEventListener("submit", e => {
 const cam = $("cam");
 function showMsg(text, retry){ $("stageMsgText").textContent = text; $("camRetry").hidden = !retry; $("stageMsg").hidden = false; }
 function hideMsg(){ $("stageMsg").hidden = true; }
-function stopCam(){
+const camLive = () => !!stream && stream.getVideoTracks().some(t => t.readyState === "live");
+/* hide this phone's camera; keep it running if it is being sent to the main phone */
+function stopCam(force){
+  cam.hidden = true; cam.srcObject = null;
+  if (!force && isSending()) return;
   if (stream) stream.getTracks().forEach(t => t.stop());
-  stream = null; cam.srcObject = null; cam.hidden = true;
+  stream = null; camFacing = null;
+}
+/* one camera stream shared by the preview and the copy sent to the main phone */
+async function getCam(facing){
+  if (camLive() && camFacing === facing) return stream;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+  camFacing = facing;
+  updateSendTrack();
+  return stream;
 }
 async function startCam(facing){
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
     showMsg("The camera works when the app is opened from its https address.", false); return;
   }
-  showMsg("Starting camera…", false);
+  if (!camLive()) showMsg("Starting camera…", false);
   try {
-    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
-    cam.srcObject = stream;
+    const s = await getCam(facing);
+    cam.srcObject = s;
     cam.classList.toggle("mirror", facing === "user");
     cam.hidden = false;
     try { await cam.play(); } catch {}
     hideMsg();
   } catch (err) {
-    stream = null;
+    stream = null; camFacing = null;
     showMsg(err && err.name === "NotAllowedError" ? "Camera access is off. Tap below and choose Allow." : "The camera couldn't start.", true);
   }
 }
 async function applySource(){
-  if (cfg.layout === "chat"){ stopCam(); hideMsg(); $("flip").hidden = true; return; }
+  const rv = $("remoteCam");
+  if (cfg.layout === "chat"){ stopCam(); rv.hidden = true; hideMsg(); $("flip").hidden = true; return; }
   const src = cfg.source, isCam = src === "back" || src === "front";
   $("flip").hidden = !isCam;
   $("media").hidden = src !== "media";
-  if (!isCam) stopCam();
-  if (isCam){ stopCam(); await startCam(src === "back" ? "environment" : "user"); }
-  else if (src === "media" && !mediaURL) showMsg("Pick a photo or video in stream settings.", false);
-  else hideMsg();
+  rv.hidden = !(src === "remote" && net.remote);
+  if (src === "remote"){
+    stopCam();
+    if (net.remote){ hideMsg(); rv.play().catch(() => {}); }
+    else showMsg(net.role === "host"
+      ? "Waiting for a friend's camera. On their phone: Connect phones, Join, Send my camera."
+      : "Start a room in Connect phones, then have a friend join with Send my camera on.", false);
+    return;
+  }
+  if (isCam) await startCam(src === "back" ? "environment" : "user");
+  else {
+    stopCam();
+    if (src === "media" && !mediaURL) showMsg("Pick a photo or video in stream settings.", false);
+    else hideMsg();
+  }
 }
 $("camRetry").addEventListener("click", applySource);
 $("flip").addEventListener("click", () => {
@@ -919,7 +1032,8 @@ document.addEventListener("visibilitychange", () => {
   if (document.hidden) return;
   keepAwake();
   const isCam = cfg.layout !== "chat" && (cfg.source === "back" || cfg.source === "front");
-  if (isCam && (!stream || stream.getVideoTracks().every(t => t.readyState === "ended"))) applySource();
+  if (isCam && !camLive()) applySource();
+  netWake();
 });
 
 /* double-tap the video (or the top bar) to hide/show the buttons */
@@ -969,6 +1083,7 @@ function openSettings(){
 $("openSettings").addEventListener("click", openSettings);
 $("toPrefabs").addEventListener("click", () => openPrefabs(mode === "7" ? "1" : mode));
 $("toViewers").addEventListener("click", openViewers);
+$("toConnect").addEventListener("click", openNet);
 $("toggleLive").addEventListener("click", () => { closeSheets(); if (live.on) endStream(); else goLive(); });
 $("fMedia").addEventListener("change", e => {
   const f = e.target.files && e.target.files[0];
@@ -978,6 +1093,16 @@ $("fMedia").addEventListener("change", e => {
 $("settings").addEventListener("submit", e => {
   e.preventDefault();
   const oldSource = cfg.source, oldLayout = cfg.layout;
+  if (isFollower()){
+    // the main phone controls the stream; a connected phone only picks its own screen and camera
+    cfg.layout = radioVal("fLayout") || "twitch";
+    cfg.source = radioVal("fSource") || "scene";
+    const local = Object.assign({}, CFG_DEFAULTS, store.get("chatline2.cfg") || {});
+    local.layout = cfg.layout; local.source = cfg.source;
+    store.set("chatline2.cfg", local);
+    closeSheets(); renderHeader(); applySource();
+    return;
+  }
   Object.assign(cfg, {
     streamer: $("fStreamer").value.trim() || CFG_DEFAULTS.streamer,
     title: $("fTitle").value.trim(),
@@ -1074,6 +1199,7 @@ QUICK.forEach(n => {
   $("vQuick").appendChild(b);
 });
 function openViewers(){
+  if (isFollower()){ toast("The main phone controls the viewer count"); return; }
   $("vNow").value = "";
   $("vTo").value = vset.climbTo;
   radio("vTime", vset.climbSec); radio("vWob", vset.wobble);
@@ -1109,17 +1235,359 @@ $("viewerForm").addEventListener("submit", e => {
   closeSheets(); renderProgress();
 });
 
+/* ================= connected phones ================= */
+/* The main phone ("host") makes the chat and sends every line, the viewer count, uptime and
+   the running prefab to joined phones ("followers"). Followers can type into the shared chat
+   and can send their camera to the main phone. Phones talk directly (WebRTC via PeerJS). */
+const CODE_CHARS = "ABCDEFGHJKMNPQRSTUVWXYZ23456789";
+const makeCode = () => Array.from({ length: 6 }, () => CODE_CHARS[Math.floor(Math.random() * CODE_CHARS.length)]).join("");
+const normCode = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+const peerId = code => "chatline-live-" + code.toLowerCase();
+const NET_RETRY = ["network", "server-error", "socket-error", "socket-closed", "disconnected"];
+
+function iceConfig(){
+  const servers = [{ urls: "stun:stun.l.google.com:19302" }];
+  let host = String(netCfg.relayServer || "").trim().replace(/^(turns?|stun):/i, "").replace(/\?.*$/, "");
+  if (host && !/:\d+$/.test(host)) host += ":3478";
+  if (host && netCfg.relayUser && netCfg.relayPass){
+    servers.push({ urls: "stun:" + host });
+    servers.push({ urls: [`turn:${host}?transport=udp`, `turn:${host}?transport=tcp`], username: netCfg.relayUser, credential: netCfg.relayPass });
+  }
+  return { iceServers: servers };
+}
+function newPeer(id){
+  if (!window.Peer){ setNetStatus("Couldn't load the connection tool. Check your internet and reopen the app."); return null; }
+  const opts = { config: iceConfig(), debug: 0 };
+  return id ? new Peer(id, opts) : new Peer(opts);
+}
+function retryPeer(p, fn){
+  try { p.destroy(); } catch {}
+  if (net.peer === p) net.peer = null;
+  clearTimeout(net.retryT);
+  net.retryT = setTimeout(fn, 4000);
+}
+function watchServer(p){
+  p.on("disconnected", () => setTimeout(() => {
+    if (net.peer === p && !p.destroyed && p.disconnected){ try { p.reconnect(); } catch {} }
+  }, 2000));
+}
+function setNetStatus(t){ net.status = t; renderNet(); }
+function broadcast(m){
+  if (net.role !== "host") return;
+  for (const c of net.conns.values()) if (c.conn.open){ try { c.conn.send(m); } catch {} }
+}
+function hostState(){
+  return { t: "state", streamer: cfg.streamer, title: cfg.title, category: cfg.category, tags: cfg.tags,
+           on: live.on, up: Date.now() - live.startedAt, v: Math.round(vs.now),
+           mode, name: prefabs[mode].name, left: modeEnds ? Math.max(0, modeEnds - Date.now()) : 0 };
+}
+function pushState(){ if (net.role === "host" && net.conns.size) broadcast(hostState()); }
+
+/* ---- main phone ---- */
+function startHost(){
+  const code = netCfg.hostCode || makeCode();
+  leaveNet(true);
+  netCfg.hostCode = code; netCfg.mode = "host"; saveNet();
+  net.role = "host";
+  setNetStatus("Starting room…");
+  openHostPeer();
+}
+function openHostPeer(){
+  clearTimeout(net.retryT);
+  if (net.role !== "host") return;
+  const p = newPeer(peerId(netCfg.hostCode));
+  if (!p) return;
+  net.peer = p;
+  watchServer(p);
+  p.on("open", () => { if (net.peer === p) setNetStatus(net.conns.size ? "Room is on" : "Room is on. Waiting for phones…"); });
+  p.on("connection", conn => {
+    conn.on("open", () => {
+      net.conns.set(conn.peer, { conn, cam: false });
+      try { conn.send({ t: "hello", hist: net.history.slice(-30), state: hostState() }); } catch {}
+      setNetStatus("Room is on");
+      toast("A phone connected");
+    });
+    conn.on("data", d => onHostData(conn, d));
+    const gone = () => {
+      const c = net.conns.get(conn.peer);
+      if (c && c.conn === conn){ net.conns.delete(conn.peer); renderNet(); }
+    };
+    conn.on("close", gone); conn.on("error", gone);
+  });
+  p.on("call", call => {
+    if (!call.metadata || call.metadata.role !== "camera"){ try { call.close(); } catch {} return; }
+    call.answer();
+    call.on("stream", s => setRemoteCam(s, call));
+    const end = () => { if (net.remote && net.remote.call === call) clearRemoteCam(); };
+    call.on("close", end); call.on("error", end);
+  });
+  p.on("error", err => {
+    if (net.peer !== p) return;
+    if (err.type === "unavailable-id"){ setNetStatus("Room code still in use. Retrying…"); retryPeer(p, openHostPeer); }
+    else if (NET_RETRY.includes(err.type)){ setNetStatus("Connection lost. Retrying…"); retryPeer(p, openHostPeer); }
+    else if (err.type === "browser-incompatible") setNetStatus("This browser can't connect phones. Use Safari.");
+  });
+}
+function onHostData(conn, d){
+  if (!d || typeof d !== "object") return;
+  if (d.t === "say"){
+    const name = String(d.name || "").replace(/\s+/g, "_").slice(0, 25) || "viewer";
+    const text = String(d.text || "").trim().slice(0, 300);
+    if (text) chatLine(name, text, false);
+  } else if (d.t === "cam"){
+    const c = net.conns.get(conn.peer);
+    if (c){ c.cam = !!d.on; renderNet(); }
+  }
+}
+function setRemoteCam(s, call){
+  if (net.remote && net.remote.call !== call){ try { net.remote.call.close(); } catch {} }
+  net.remote = { stream: s, call };
+  $("remoteCam").srcObject = s;
+  if (cfg.source === "remote") applySource();
+  else toast("A friend's camera is ready. Pick Friend's camera in settings.");
+  renderNet();
+}
+function clearRemoteCam(){
+  net.remote = null;
+  $("remoteCam").srcObject = null;
+  if (cfg.source === "remote") applySource();
+  renderNet();
+}
+
+/* ---- joined phone ---- */
+function stopSim(){ clearTimeout(chatT); clearTimeout(eventT); wave = null; mode = "7"; modeEnds = 0; modeDur = 0; }
+function joinRoom(code){
+  code = normCode(code);
+  if (code.length < 4){ toast("Type the room code from the main phone"); return; }
+  leaveNet(true);
+  netCfg.joinCode = code; netCfg.mode = "follower"; saveNet();
+  net.role = "follower";
+  stopSim();
+  $("app").classList.add("follower");
+  list.textContent = "";
+  systemLine("Connecting to the main phone…", true);
+  setNetStatus("Connecting…");
+  applySource();
+  openFollowerPeer();
+}
+function openFollowerPeer(){
+  clearTimeout(net.retryT);
+  if (!isFollower()) return;
+  const p = newPeer();
+  if (!p) return;
+  net.peer = p;
+  watchServer(p);
+  p.on("open", () => { if (net.peer === p) connectToHost(); });
+  p.on("error", err => {
+    if (net.peer !== p) return;
+    if (err.type === "peer-unavailable"){ setNetStatus("Can't find that room. Is it on? Retrying…"); scheduleRejoin(); }
+    else if (NET_RETRY.includes(err.type)){ setNetStatus("Connection lost. Retrying…"); retryPeer(p, openFollowerPeer); }
+    else if (err.type === "browser-incompatible") setNetStatus("This browser can't connect phones. Use Safari.");
+  });
+}
+function scheduleRejoin(){ clearTimeout(net.joinT); net.joinT = setTimeout(connectToHost, 4000); }
+function connectToHost(){
+  clearTimeout(net.joinT);
+  if (!isFollower() || !net.peer || net.peer.destroyed) return;
+  if (net.peer.disconnected){ try { net.peer.reconnect(); } catch {} scheduleRejoin(); return; }
+  if (net.hostConn){ const old = net.hostConn; net.hostConn = null; try { old.close(); } catch {} }
+  const conn = net.peer.connect(peerId(netCfg.joinCode), { reliable: true, metadata: { name: netCfg.name || "" } });
+  net.hostConn = conn;
+  const timer = setTimeout(() => { if (!conn.open) lost(); }, 15000);
+  function lost(){
+    clearTimeout(timer);
+    if (net.hostConn !== conn) return;
+    net.hostConn = null;
+    try { conn.close(); } catch {}
+    stopSendCall();
+    setNetStatus(netCfg.relayUser ? "Lost the main phone. Reconnecting…" : "Can't reach the main phone. Reconnecting… On mobile data, add a relay below.");
+    scheduleRejoin();
+  }
+  conn.on("open", () => {
+    clearTimeout(timer);
+    setNetStatus("Synced with the main phone");
+    if (netCfg.sendCam) startSendCam();
+  });
+  conn.on("data", onFollowerData);
+  conn.on("close", lost); conn.on("error", lost);
+}
+function onFollowerData(d){
+  if (!d || typeof d !== "object") return;
+  if (d.t === "hello"){
+    list.textContent = "";
+    (Array.isArray(d.hist) ? d.hist : []).forEach(showRemote);
+    if (d.state) applyHostState(d.state);
+  } else if (d.t === "state") applyHostState(d);
+  else showRemote(d);
+}
+function showRemote(m){
+  if (!m) return;
+  if (m.t === "chat") chatLine(String(m.n), String(m.x), !!m.s, true);
+  else if (m.t === "ev") eventLine(String(m.l), String(m.u || ""), String(m.k || "").replace(/[^a-z]/g, ""), true);
+  else if (m.t === "sys") systemLine(String(m.x), true);
+}
+function applyHostState(s){
+  Object.assign(cfg, { streamer: String(s.streamer || ""), title: String(s.title || ""), category: String(s.category || ""), tags: String(s.tags || "") });
+  live = { on: !!s.on, startedAt: Date.now() - (+s.up || 0) };
+  vs.now = +s.v || 0;
+  net.hostView = { on: !!s.on, mode: String(s.mode || "7"), name: String(s.name || ""), ends: Date.now() + (+s.left || 0) };
+  renderHeader();
+}
+
+/* ---- sending this phone's camera to the main phone ---- */
+async function startSendCam(){
+  if (!isSending() || !net.peer || !net.hostConn || !net.hostConn.open) return;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast("This phone can't send its camera from here"); return; }
+  try {
+    const s = await getCam(cfg.source === "front" ? "user" : "environment");
+    stopSendCall();
+    const call = net.peer.call(peerId(netCfg.joinCode), s, { metadata: { role: "camera", name: netCfg.name || "" } });
+    net.camCall = call;
+    call.on("close", () => { if (net.camCall === call) net.camCall = null; });
+    try { net.hostConn.send({ t: "cam", on: true }); } catch {}
+    setNetStatus("Synced · sending your camera");
+    if (cfg.layout !== "chat" && (cfg.source === "back" || cfg.source === "front")) applySource();
+  } catch (err) {
+    toast(err && err.name === "NotAllowedError" ? "Camera access is off for this app" : "Couldn't start your camera");
+  }
+}
+function stopSendCall(){
+  if (net.camCall){ const c = net.camCall; net.camCall = null; try { c.close(); } catch {} }
+}
+function updateSendTrack(){
+  const pc = net.camCall && net.camCall.peerConnection;
+  const t = stream && stream.getVideoTracks()[0];
+  if (!pc || !t) return;
+  pc.getSenders().forEach(s => { if (s.track && s.track.kind === "video") s.replaceTrack(t).catch(() => {}); });
+}
+
+/* ---- leaving / waking up ---- */
+function leaveNet(keepMode){
+  clearTimeout(net.retryT); clearTimeout(net.joinT);
+  const wasFollower = isFollower(), wasHost = net.role === "host";
+  stopSendCall();
+  if (net.remote){ try { net.remote.call.close(); } catch {} }
+  net.remote = null; $("remoteCam").srcObject = null;
+  for (const c of net.conns.values()){ try { c.conn.close(); } catch {} }
+  net.conns.clear();
+  if (net.hostConn){ const h = net.hostConn; net.hostConn = null; try { h.close(); } catch {} }
+  const p = net.peer; net.peer = null;
+  if (p){ try { p.destroy(); } catch {} }
+  net.role = "solo"; net.status = ""; net.hostView = null;
+  $("app").classList.remove("follower");
+  if (!keepMode){ netCfg.mode = "solo"; saveNet(); }
+  if (wasFollower){
+    cfg = Object.assign({}, CFG_DEFAULTS, store.get("chatline2.cfg") || {});
+    live = store.get("chatline2.live") || { on: true, startedAt: Date.now() };
+    vs.now = vset.target; vs.from = vset.target; vs.climbMs = 0;
+    parseAll();
+    list.textContent = "";
+    systemLine("Disconnected. Back to this phone's own chat.", true);
+    renderHeader();
+    applySource();
+    if (live.on){ scheduleChat(); scheduleEvents(); }
+  } else if (wasHost && cfg.source === "remote") applySource();
+  renderNet();
+}
+function netWake(){
+  if (net.role === "host"){
+    if (!net.peer || net.peer.destroyed) openHostPeer();
+    else if (net.peer.disconnected){ try { net.peer.reconnect(); } catch {} }
+  } else if (isFollower()){
+    if (!net.peer || net.peer.destroyed) openFollowerPeer();
+    else if (!net.hostConn || !net.hostConn.open) connectToHost();
+    else if (netCfg.sendCam && (!net.camCall || !camLive())) startSendCam();
+  }
+}
+
+/* ---- connect sheet ---- */
+function renderNet(){
+  const r = net.role;
+  $("netSolo").hidden = r !== "solo";
+  $("netHosting").hidden = r !== "host";
+  $("netJoined").hidden = r !== "follower";
+  $("netCode").textContent = r === "host" ? netCfg.hostCode : r === "follower" ? netCfg.joinCode : "—";
+  $("netStatus").textContent = net.status || (r === "solo" ? "Not connected" : "");
+  if (r === "host"){
+    const n = net.conns.size, c = [...net.conns.values()].filter(x => x.cam).length;
+    $("netPeers").textContent = n
+      ? `${n} phone${n > 1 ? "s" : ""} connected${c ? ` · ${c} sending a camera` : ""}${net.remote ? " · friend's camera is coming through" : ""}`
+      : "No phones connected yet.";
+  } else $("netPeers").textContent = "";
+  $("jCam2").checked = !!netCfg.sendCam;
+  $("netBadge").textContent = r === "host" ? `· Room ${netCfg.hostCode} · ${net.conns.size}`
+    : r === "follower" ? (net.hostConn && net.hostConn.open ? "· Synced" : "· Reconnecting…") : "";
+}
+function openNet(){
+  $("jCode").value = netCfg.joinCode || "";
+  $("jName").value = netCfg.name || "";
+  $("jCam").checked = !!netCfg.sendCam;
+  $("rServer").value = netCfg.relayServer || "";
+  $("rUser").value = netCfg.relayUser || "";
+  $("rPass").value = netCfg.relayPass || "";
+  renderNet();
+  openSheet("netWrap");
+}
+$("hostStart").addEventListener("click", startHost);
+$("hostStop").addEventListener("click", () => { leaveNet(false); toast("Room stopped"); });
+$("newCode").addEventListener("click", () => { netCfg.hostCode = makeCode(); saveNet(); startHost(); });
+$("copyLink").addEventListener("click", async () => {
+  const link = location.origin + location.pathname + "#join=" + netCfg.hostCode;
+  try { await navigator.clipboard.writeText(link); toast("Invite link copied"); }
+  catch { toast(link); }
+});
+$("joinBtn").addEventListener("click", () => {
+  netCfg.name = $("jName").value.trim().replace(/\s+/g, "_").slice(0, 25) || "guest" + rint(100, 999);
+  netCfg.sendCam = $("jCam").checked;
+  saveNet();
+  joinRoom($("jCode").value);
+  if (isFollower()) closeSheets();
+});
+$("leaveBtn").addEventListener("click", () => { leaveNet(false); toast("Left the room"); });
+$("jCam2").addEventListener("change", e => {
+  netCfg.sendCam = e.target.checked; saveNet();
+  if (netCfg.sendCam) startSendCam();
+  else {
+    stopSendCall();
+    try { if (net.hostConn && net.hostConn.open) net.hostConn.send({ t: "cam", on: false }); } catch {}
+    applySource();
+    setNetStatus("Synced with the main phone");
+  }
+});
+$("netForm").addEventListener("submit", e => {
+  e.preventDefault();
+  netCfg.relayServer = $("rServer").value.trim();
+  netCfg.relayUser = $("rUser").value.trim();
+  netCfg.relayPass = $("rPass").value.trim();
+  saveNet();
+  closeSheets();
+  toast("Relay saved");
+  if (net.role === "host") startHost();
+  else if (isFollower()) joinRoom(netCfg.joinCode);
+});
+
 /* ================= start ================= */
 parseAll();
 renderHeader();
-applySource();
-if (live.on){
-  systemLine("Welcome to the chat room!");
-  for (let i = 0; i < 14; i++) normalChatter();
-  wave = null;
-  scheduleChat(); scheduleEvents();
+renderNet();
+if (netCfg.mode === "follower" && netCfg.joinCode){
+  joinRoom(netCfg.joinCode);
 } else {
-  systemLine(`${cfg.streamer} is offline.`);
+  applySource();
+  if (live.on){
+    systemLine("Welcome to the chat room!");
+    for (let i = 0; i < 14; i++) normalChatter();
+    wave = null;
+    scheduleChat(); scheduleEvents();
+  } else {
+    systemLine(`${cfg.streamer} is offline.`);
+  }
+  if (netCfg.mode === "host") startHost();
+}
+const invite = /^#join=([A-Za-z0-9]{4,8})$/.exec(location.hash);
+if (invite){
+  try { history.replaceState(null, "", location.pathname); } catch {}
+  if (!isFollower()){ netCfg.joinCode = normCode(invite[1]); openNet(); }
 }
 })();
 </script>
