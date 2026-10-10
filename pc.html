@@ -1,0 +1,346 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#0e0d12">
+<link rel="icon" href="icon.png">
+<title>Chatline Clip Folder</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
+<style>
+/* The PC side of Chatline clips: one screen. Type the phone's code, pick a folder, and every clip
+   the phone takes is written into that folder. Dark only, to match the app. */
+:root{
+  --bg:#0e0d12;
+  --panel:#17161d;
+  --raise:#221f2b;
+  --line:#2d2a37;
+  --fg:#efedf5;
+  --muted:#a19db0;
+  --accent:#a873ff;
+  --accent-ink:#ffffff;
+  --live:#e8273b;
+  --ok:#22a861;
+  --warn:#ffb547;
+  --ui:"Figtree",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:dark;
+}
+*,*::before,*::after{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--fg);font:15px/1.45 var(--ui);display:flex;justify-content:center;padding:40px 16px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,input:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+main{width:100%;max-width:480px;display:grid;gap:20px;align-content:start}
+header{display:flex;gap:12px;align-items:center}
+header img{width:44px;height:44px;border-radius:10px}
+h1{margin:0;font-size:20px;font-weight:800;letter-spacing:-.01em}
+header p{margin:2px 0 0;color:var(--muted);font-size:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px;display:grid;gap:18px}
+.step{display:grid;gap:8px}
+.step .lbl{display:flex;gap:8px;align-items:center;font-weight:700;font-size:14px}
+.step .num{width:22px;height:22px;border-radius:50%;background:var(--raise);display:grid;place-items:center;font-size:12px;font-weight:800;color:var(--muted)}
+.step.done .num{background:var(--ok);color:#fff}
+.step small{color:var(--muted);font-size:13px}
+#code{font:inherit;font-size:28px;font-weight:800;letter-spacing:.2em;text-transform:uppercase;color:var(--fg);background:var(--raise);border:1px solid var(--line);border-radius:8px;padding:10px 14px;width:100%}
+#code:focus{border-color:var(--accent);outline:none}
+#code::placeholder{color:#4a4656;letter-spacing:.2em}
+.btn{border:0;border-radius:8px;padding:11px 16px;font-weight:700;background:var(--accent);color:var(--accent-ink)}
+.btn.ghost{background:var(--raise);color:var(--fg);font-weight:600}
+.folder{display:flex;gap:10px;align-items:center;justify-content:space-between;background:var(--raise);border-radius:8px;padding:10px 12px}
+.folder b{display:flex;gap:8px;align-items:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.folder svg{flex:none;width:18px;height:18px;color:var(--accent)}
+.folder .btn{padding:7px 12px;font-size:13px}
+.status{display:flex;gap:12px;align-items:center;padding:14px 16px;border-radius:10px;background:var(--raise);font-weight:600}
+.status .dot{flex:none;width:12px;height:12px;border-radius:50%;background:var(--muted)}
+.status.ready .dot{background:var(--ok);box-shadow:0 0 0 4px rgba(34,168,97,.2)}
+.status.wait .dot{background:var(--warn)}
+.status.busy .dot{background:var(--accent);animation:pulse 1s ease-in-out infinite alternate}
+.status.bad .dot{background:var(--live)}
+@keyframes pulse{to{opacity:.35}}
+@media (prefers-reduced-motion:reduce){.status.busy .dot{animation:none}}
+h2{margin:0;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+ul{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+li{display:flex;justify-content:space-between;gap:12px;font-size:14px;padding:8px 12px;background:var(--panel);border:1px solid var(--line);border-radius:8px}
+li span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-nums}
+.empty{color:var(--muted);font-size:14px}
+.note{color:var(--muted);font-size:13px;margin:0}
+.unsupported{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icon.png" alt="">
+    <div>
+      <h1>Chatline Clip Folder</h1>
+      <p>Clips from your phone save into a folder on this PC.</p>
+    </div>
+  </header>
+
+  <div class="unsupported" id="unsupported" hidden>
+    <b>Open this page in Chrome or Edge.</b>
+    <p class="note">This browser can't save files into a folder on your PC.</p>
+  </div>
+
+  <div class="card" id="setup">
+    <div class="step" id="step1">
+      <label class="lbl" for="code"><span class="num">1</span>Code from your phone</label>
+      <input id="code" type="text" maxlength="8" autocomplete="off" spellcheck="false" placeholder="------" aria-describedby="codeHelp">
+      <small id="codeHelp">On your phone in Chatline: sliders button → Connect phones → Start room.</small>
+    </div>
+    <div class="step" id="step2">
+      <span class="lbl"><span class="num">2</span>Folder for clips</span>
+      <button type="button" class="btn" id="pick">Choose folder</button>
+      <div class="folder" id="folderRow" hidden>
+        <b><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" aria-hidden="true"><path d="M3 6a1 1 0 0 1 1-1h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/></svg><span id="folderName"></span></b>
+        <button type="button" class="btn ghost" id="change">Change</button>
+      </div>
+      <button type="button" class="btn" id="allow" hidden>Allow saving</button>
+    </div>
+  </div>
+
+  <div class="status" id="status" role="status" aria-live="polite"><span class="dot"></span><span id="statusText">Starting…</span></div>
+
+  <section style="display:grid;gap:10px">
+    <h2>Saved this session</h2>
+    <ul id="saved"></ul>
+    <p class="empty" id="savedEmpty">Nothing yet. Tap CLIP on your phone.</p>
+  </section>
+
+  <p class="note">Keep this tab open while you stream (minimized is fine). If your PC sleeps, clips wait on the phone and arrive when you come back.</p>
+</main>
+
+<script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+
+/* same room and relay as the app (see index.html: connected phones) */
+const BUILTIN_RELAY = { server: "free.expressturn.com:3478", user: "000000002106968723", pass: "yGwvmAYW4X/Ck9BRD5DCV3pbMtA=" };
+const NET_RETRY = ["network", "server-error", "socket-error", "socket-closed", "disconnected"];
+const peerId = code => "chatline-live-" + code.toLowerCase();
+const normCode = s => String(s || "").toUpperCase().replace(/[^A-Z0-9]/g, "");
+function iceConfig(){
+  const r = BUILTIN_RELAY, host = r.server;
+  return { iceServers: [
+    { urls: "stun:stun.l.google.com:19302" },
+    { urls: "stun:" + host },
+    { urls: [`turn:${host}?transport=udp`, `turn:${host}?transport=tcp`], username: r.user, credential: r.pass }
+  ] };
+}
+
+const st = {
+  code: "", dir: null, ok: false,
+  peer: null, conn: null, retryT: null, noPhone: false, failed: "",
+  parts: new Map(), recv: null
+};
+try { st.code = normCode(localStorage.getItem("chatlinePC.code")); } catch {}
+
+/* ---- remembering the folder (browsers keep folder access in IndexedDB) ---- */
+function db(){
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("chatline-pc", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("kv");
+    r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error);
+  });
+}
+async function dbGet(k){
+  try { const d = await db(); return await new Promise(res => { const q = d.transaction("kv").objectStore("kv").get(k); q.onsuccess = () => res(q.result || null); q.onerror = () => res(null); }); }
+  catch { return null; }
+}
+async function dbSet(k, v){ try { const d = await db(); d.transaction("kv", "readwrite").objectStore("kv").put(v, k); } catch {} }
+
+async function checkFolder(ask){
+  let ok = false;
+  if (st.dir){
+    try {
+      let p = await st.dir.queryPermission({ mode: "readwrite" });
+      if (p !== "granted" && ask) p = await st.dir.requestPermission({ mode: "readwrite" });
+      ok = p === "granted";
+    } catch {}
+  }
+  st.ok = ok; st.failed = "";
+  tell(); render();
+  return ok;
+}
+async function pickFolder(){
+  try {
+    const h = await window.showDirectoryPicker({ id: "chatline-clips", mode: "readwrite", startIn: "videos" });
+    st.dir = h; dbSet("dir", h);
+    await checkFolder(true);
+  } catch (err) {
+    if (!err || err.name !== "AbortError"){ st.failed = "Couldn't use that folder. Pick a different one."; render(); }
+  }
+}
+
+/* ---- connecting to the phone's room ---- */
+function connect(){
+  clearTimeout(st.retryT);
+  if (!st.code || !window.Peer) { render(); return; }
+  if (!st.peer || st.peer.destroyed){
+    const p = new Peer({ config: iceConfig(), debug: 0 });
+    st.peer = p;
+    p.on("open", () => { if (st.peer === p) openConn(); });
+    p.on("disconnected", () => setTimeout(() => {
+      if (st.peer === p && !p.destroyed && p.disconnected){ try { p.reconnect(); } catch {} }
+    }, 2000));
+    p.on("error", err => {
+      if (st.peer !== p) return;
+      if (err.type === "peer-unavailable"){
+        st.noPhone = true; dropConn();
+        st.retryT = setTimeout(openConn, 5000);
+      } else if (NET_RETRY.includes(err.type)){
+        try { p.destroy(); } catch {}
+        st.peer = null; dropConn();
+        st.retryT = setTimeout(connect, 4000);
+      }
+      render();
+    });
+  } else if (st.peer.open) openConn();
+  render();
+}
+function dropConn(){
+  const c = st.conn; st.conn = null;
+  if (c){ try { c.close(); } catch {} }
+}
+function openConn(){
+  clearTimeout(st.retryT);
+  if (!st.code || !st.peer || !st.peer.open) return;
+  dropConn();
+  const c = st.peer.connect(peerId(st.code), { reliable: true, metadata: { name: "pc" } });
+  st.conn = c;
+  const timer = setTimeout(() => { if (!c.open) lost(); }, 15000);
+  function lost(){
+    clearTimeout(timer);
+    if (st.conn !== c) return;
+    st.conn = null;
+    try { c.close(); } catch {}
+    st.recv = null;
+    st.retryT = setTimeout(openConn, 4000);
+    render();
+  }
+  c.on("open", () => { clearTimeout(timer); st.noPhone = false; tell(); render(); });
+  c.on("data", onData);
+  c.on("close", lost); c.on("error", lost);
+  render();
+}
+const linked = () => !!(st.conn && st.conn.open);
+/* tell the phone whether clips can be saved here; it sends waiting clips as soon as this is on */
+function tell(){ if (linked()){ try { st.conn.send({ t: "clipdir", on: st.ok }); } catch {} } }
+
+/* ---- receiving and saving clips ---- */
+function onData(d){
+  if (!d || typeof d !== "object" || d.t !== "clippart") return; // chat and the rest are for phones
+  const id = String(d.id || "");
+  const data = d.data;
+  if (!id || !(data instanceof ArrayBuffer || ArrayBuffer.isView(data) || data instanceof Blob)) return;
+  let e = st.parts.get(id);
+  if (!e){ e = { parts: [], got: 0, n: Math.max(1, +d.n || 1) }; st.parts.set(id, e); }
+  if (!e.parts[d.i]){ e.parts[d.i] = data; e.got++; }
+  st.recv = { pct: Math.round(e.got / e.n * 100) };
+  render();
+  if (e.got < e.n) return;
+  st.parts.delete(id);
+  const name = String(d.name || "chatline-clip.mp4").replace(/[\\/:*?"<>|]/g, "_");
+  save(id, name, new Blob(e.parts, { type: String(d.type || "video/mp4") }));
+}
+async function save(id, name, blob){
+  try {
+    const fh = await st.dir.getFileHandle(name, { create: true });
+    const w = await fh.createWritable();
+    await w.write(blob); await w.close();
+    if (linked()){ try { st.conn.send({ t: "clipsaved", id }); } catch {} }
+    st.recv = null; st.failed = "";
+    addSaved(name, blob.size);
+  } catch {
+    st.recv = null;
+    st.failed = "Couldn't save into the folder. Click Change and pick it again.";
+    st.ok = false; tell();
+  }
+  render();
+}
+function addSaved(name, size){
+  $("savedEmpty").hidden = true;
+  const li = document.createElement("li");
+  const a = document.createElement("span"); a.textContent = name;
+  const b = document.createElement("span");
+  b.textContent = (size / 1048576).toFixed(1) + " MB · " + new Date().toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  li.append(a, b);
+  $("saved").prepend(li);
+}
+
+/* ---- screen ---- */
+function setStatus(kind, text){
+  $("status").className = "status " + kind;
+  $("statusText").textContent = text;
+  document.title = (kind === "ready" ? "● " : "") + "Chatline Clip Folder";
+}
+function render(){
+  $("step1").classList.toggle("done", st.code.length >= 4);
+  $("step2").classList.toggle("done", !!st.dir && st.ok);
+  $("pick").hidden = !!st.dir;
+  $("folderRow").hidden = !st.dir;
+  $("folderName").textContent = st.dir ? st.dir.name : "";
+  $("allow").hidden = !st.dir || st.ok;
+  if (st.dir) $("allow").textContent = `Allow saving to "${st.dir.name}"`;
+
+  if (!window.Peer) return setStatus("bad", "Couldn't load the connection tool. Check your internet and reload.");
+  if (st.code.length < 4) return setStatus("wait", "Type the code from your phone.");
+  if (!st.dir) return setStatus("wait", "Choose a folder for your clips.");
+  if (st.failed) return setStatus("bad", st.failed);
+  if (!st.ok) return setStatus("wait", "Click Allow saving so clips can go into your folder.");
+  if (st.recv) return setStatus("busy", `Receiving a clip… ${st.recv.pct}%`);
+  if (linked()) return setStatus("ready", `Ready. Tap CLIP on your phone and it saves into "${st.dir.name}".`);
+  if (st.noPhone) return setStatus("bad", `Can't find your phone. Make sure Chatline is open on it and the code is ${st.code}.`);
+  return setStatus("busy", "Connecting to your phone…");
+}
+
+/* ---- wiring ---- */
+if (!("showDirectoryPicker" in window)){
+  $("unsupported").hidden = false;
+  $("setup").hidden = true;
+  setStatus("bad", "Open this page in Chrome or Edge.");
+  return;
+}
+const codeIn = $("code");
+codeIn.value = st.code;
+function codeChanged(){
+  const c = normCode(codeIn.value);
+  if (c === st.code) return;
+  st.code = c; st.noPhone = false;
+  try { localStorage.setItem("chatlinePC.code", c); } catch {}
+  dropConn();
+  if (c.length >= 6) connect(); else render();
+}
+codeIn.addEventListener("input", () => { if (normCode(codeIn.value).length >= 6) codeChanged(); else { st.code = normCode(codeIn.value); dropConn(); render(); } });
+codeIn.addEventListener("change", codeChanged);
+codeIn.addEventListener("keydown", e => { if (e.key === "Enter") codeChanged(); });
+$("pick").addEventListener("click", pickFolder);
+$("change").addEventListener("click", pickFolder);
+$("allow").addEventListener("click", () => checkFolder(true));
+
+/* come back after sleep, lost internet or a phone restart */
+function wake(){
+  if (st.code.length < 4) return;
+  if (!st.peer || st.peer.destroyed) connect();
+  else if (st.peer.disconnected){ try { st.peer.reconnect(); } catch {} }
+  else if (!st.conn && st.peer.open) openConn();
+}
+window.addEventListener("online", wake);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) wake(); });
+setInterval(wake, 15000);
+
+render();
+dbGet("dir").then(async h => {
+  if (h){ st.dir = h; await checkFolder(false); }
+  if (st.code.length >= 4) connect(); else { render(); codeIn.focus(); }
+});
+})();
+</script>
+</body>
+</html>
