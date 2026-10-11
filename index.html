@@ -111,7 +111,7 @@ button:focus-visible,input:focus-visible,textarea:focus-visible{outline:2px soli
 
 /* ---- dock: prefab buttons + chat box ---- */
 .dock{display:grid;gap:8px;padding:8px 16px calc(8px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}
-.prefabs{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
+.prefabs{display:grid;grid-template-columns:repeat(11,minmax(0,1fr));gap:4px}
 .pf{position:relative;overflow:hidden;height:38px;border:0;border-radius:6px;background:var(--raise);font-family:var(--num);font-weight:700;font-size:19px;display:grid;place-items:center;padding:0}
 .pf.on{background:var(--accent);color:var(--accent-ink)}
 .pf .bar,.climb .bar{position:absolute;left:0;bottom:0;height:3px;width:0;background:currentColor}
@@ -183,7 +183,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 .chip span,.chipbtn{display:block;padding:7px 12px;border-radius:999px;background:var(--raise);font-weight:600;font-size:13px;border:0}
 .chip input:checked+span{background:var(--accent);color:var(--accent-ink)}
 .chip input:focus-visible+span{outline:2px solid var(--accent);outline-offset:2px}
-.tabs{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:4px}
+.tabs{display:grid;grid-template-columns:repeat(10,minmax(0,1fr));gap:4px}
 .tabs button{height:38px;border:0;border-radius:6px;background:var(--raise);font-family:var(--num);font-weight:700;font-size:18px}
 .tabs button.on{background:var(--accent);color:var(--accent-ink)}
 .bignum{display:grid;gap:2px;padding:12px 14px;background:var(--raise);border-radius:8px}
@@ -196,7 +196,19 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 
 .toast{position:fixed;left:50%;top:calc(env(safe-area-inset-top,0px) + 12px);transform:translateX(-50%);z-index:20;background:var(--scrim);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);padding:8px 14px;border-radius:999px;font-weight:600;font-size:13px;white-space:nowrap;max-width:calc(100% - 32px);overflow:hidden;text-overflow:ellipsis}
 /* ---- connected phones ---- */
-.follower .prefabs,.follower .climb,.follower #toggleLive,.follower #toPrefabs,.follower #toViewers{display:none!important}
+.follower .climb,.follower #toggleLive,.follower #toPrefabs,.follower #toViewers,.follower .pf.gear{display:none!important}
+/* a joined phone only gets the prefab bar when the main phone allows it */
+.follower:not(.perm-prefabs) .prefabs{display:none!important}
+.follower .prefabs{grid-template-columns:repeat(10,minmax(0,1fr))}
+.clip2{flex:none;width:42px;position:relative;border:0;border-radius:6px;background:var(--raise);display:grid;place-items:center}
+.clip2 svg{width:20px;height:20px}
+.clip2.busy{background:var(--accent)}
+.clip2 .n{position:absolute;top:-5px;right:-5px;min-width:18px;height:18px;border-radius:9px;background:var(--live);font-family:var(--num);font-weight:700;font-size:12px;display:grid;place-items:center;padding:0 4px}
+.irl .clip2:not(.busy){background:var(--glass);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.perms{display:flex;gap:6px;flex-wrap:wrap;padding:0 12px 10px;margin-top:-4px}
+.camitem{background:var(--raise);border:1px solid transparent;border-radius:8px}
+.camitem.on{border-color:var(--ok)}
+.camitem .camrow{background:none;border:0}
 .netbadge{margin-left:8px;color:var(--ok);letter-spacing:.04em}
 .camlist{display:grid;gap:8px}
 .camrow{display:flex;gap:12px;align-items:center;justify-content:space-between;padding:10px 12px;background:var(--raise);border:1px solid transparent;border-radius:8px}
@@ -262,6 +274,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
       <div class="prefabs ctl" id="prefabs"></div>
       <form class="compose" id="compose">
         <input id="say" type="text" placeholder="Send a message" autocomplete="off" autocorrect="off" enterkeyhint="send" maxlength="300">
+        <button class="clip2 ctl" type="button" id="clipBtn2" aria-label="Clip the last 30 seconds to your PC folder" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M7 5v14M17 5v14M3 9.5h4M3 14.5h4M17 9.5h4M17 14.5h4"/></svg><span class="n" id="clipCount2" hidden>0</span></button>
         <button class="climb ctl" type="button" id="climb" aria-label="Start viewer climb (hold for viewer controls)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 17 6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg><i class="bar" id="climbBar"></i></button>
         <button class="btn" type="submit">Chat</button>
       </form>
@@ -347,7 +360,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     </div>
 
     <div id="netHosting" class="field" style="gap:14px" hidden>
-      <h3>Camera &amp; sound from</h3>
+      <h3>Phones in this room</h3>
+      <p class="note">Use picks where the stream picture, clips and PC view come from. Clip and Prefabs let that phone tap CLIP or the number buttons.</p>
       <div class="camlist" id="camList"></div>
       <p class="note" id="camListNote">To use a friend's phone: on it, open Chatline, tap the sliders button, then Connect phones. Type this code, turn on Let the main phone use my camera and sound, and tap Join. It shows up here.</p>
       <p class="note">On the other phone: open Chatline, tap the sliders button, then Connect phones. Type this code and tap Join.</p>
@@ -361,7 +375,8 @@ input[type=range]{width:100%;accent-color:var(--accent)}
     <div id="netJoined" class="field" style="gap:14px" hidden>
       <p class="note">This phone shows the main phone's chat. Anything you type shows up on every phone. To see the main phone's camera here, pick Main phone's camera under Stream picture in stream settings.</p>
       <label class="check"><input id="jCam2" type="checkbox"> Let the main phone use my camera and sound</label>
-      <p class="note">With this on, the main phone can pick this phone for the stream picture, clips and PC view. Your camera and sound only go to the main phone while it has picked this phone.</p>
+      <p class="note">With this on, the main phone can pick this phone for the stream picture, clips and PC view. Your camera and sound only go to the main phone while it has picked this phone. While it's picked, this phone records the clips itself, in full quality, and sends them to your PC folder.</p>
+      <p class="note" id="permNote"></p>
       <button type="button" class="btn danger" id="leaveBtn">Leave</button>
     </div>
 
@@ -448,6 +463,7 @@ input[type=range]{width:100%;accent-color:var(--accent)}
 <div class="toast" id="toast" hidden></div>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="mp4.js"></script>
 <script>
 (() => {
 "use strict";
@@ -2015,6 +2031,64 @@ we eating today
 the gifters are generous today
 another one 😭`,
     alt: "" },
+  "9": { name: "W's", kind: "chat", pct: 90, rate: 170, dur: 45,
+    main: `W
+W
+W
+WWW
+WWW
+wwww
+wwww
+WWWW
+WWWWWWW
+WWWWWWWWWWW
+W W W
+W W W W
+w
+ww
+www
+yooo WWW
+yooo WWW
+yoooo WWWW
+W
+W stream
+W {streamer}
+W {streamer}
+huge W
+massive W
+W fr
+W fr fr
+W 🔥
+WWW 🔥🔥
+W 💯
+W!!!
+WWWW!!
+dub
+big dub
+DUBBB
+W chat
+W's in the chat
+W's in the chat 🔥
+certified W
+W moment
+that's a W
+W W
+WWW lets gooo
+W energy
+yoooo W
+W no cap
+W 👑`,
+    alt: `LETS GOOO
+🔥🔥🔥
+HYPE
+sheesh
+yooo
+LETSSS GOOO
+GOATED
+💯💯💯
+the vibes 🔥
+he's HIM`
+  },
   "X": { name: "W waiter", kind: "chat", pct: 100, rate: 150, dur: 45,
     main: `w waiter
 w waiter
@@ -2057,7 +2131,7 @@ waiter has aura
 the vibes are right`,
     alt: "" }
 };
-const KEYS = ["1","2","3","4","5","6","7","8","X"];
+const KEYS = ["1","2","3","4","5","6","7","8","9","X"];
 
 const CFG_DEFAULTS = {
   streamer: "nightowl", title: "out and about, come hang", category: "IRL", tags: "English, IRL",
@@ -2093,12 +2167,24 @@ let names = [], reacts = [], pl = {};
 let paused = false, wave = null, chatT, eventT, mediaURL = null, stream = null, camFacing = null;
 
 /* connected phones: "solo" (on its own), "host" (main phone) or "follower" (mirrors the main phone) */
-const net = { role: "solo", peer: null, conns: new Map(), hostConn: null, camCall: null, camWanted: false, remote: null, main: null, retryT: null, joinT: null, status: "", history: [], hostView: null };
+const net = { role: "solo", peer: null, conns: new Map(), hostConn: null, camCall: null, camWanted: false, remote: null, main: null, retryT: null, joinT: null, healT: null, status: "", history: [], hostView: null,
+  // joined phone: what the main phone allows here, its prefab names, how many clips wait for the PC,
+  // when the main phone was last heard from, and the PC page (id + link) for sending clips straight to it
+  perms: { clip: false, prefabs: false }, prefabNames: {}, clipWait: 0, hostSeen: 0, hostPinged: false, pcId: "", pcLink: null, pcTryAt: 0,
+  // camera phone: the PC the main phone asked it to send its camera to ({ id, hq }), and that call
+  feedPc: null, pcCall: null };
 /* sendCam: this phone lets the main phone use its camera and sound. pick/pickName: on the main
-   phone, which joined phone (by its device id) the camera and sound come from ("" = this phone) */
-let netCfg = Object.assign({ mode: "solo", hostCode: "", joinCode: "", name: "", sendCam: false, dev: "", pick: "", pickName: "", relayServer: "", relayUser: "", relayPass: "" }, store.get("chatline2.net") || {});
+   phone, which joined phone (by its device id) the camera and sound come from ("" = this phone).
+   perms: on the main phone, what each joined phone (by device id) may do: { clip, prefabs }.
+   token: this phone's lasting key for its room code, so the server gives the code straight back
+   after the app restarts (a new key would have to wait for the old one to time out) */
+let netCfg = Object.assign({ mode: "solo", hostCode: "", joinCode: "", name: "", sendCam: false, dev: "", token: "", pick: "", pickName: "", perms: {}, relayServer: "", relayUser: "", relayPass: "" }, store.get("chatline2.net") || {});
 const saveNet = () => store.set("chatline2.net", netCfg);
-if (!netCfg.dev){ netCfg.dev = Math.random().toString(36).slice(2, 12); saveNet(); }
+if (!netCfg.dev || !netCfg.token){
+  netCfg.dev = netCfg.dev || Math.random().toString(36).slice(2, 12);
+  netCfg.token = netCfg.token || Math.random().toString(36).slice(2) + Math.random().toString(36).slice(2);
+  saveNet();
+}
 const isFollower = () => net.role === "follower";
 /* sending = allowed on this phone and picked by the main phone */
 const isSending = () => isFollower() && netCfg.sendCam && net.camWanted;
@@ -2288,11 +2374,19 @@ for (const k of KEYS){
   const b = document.createElement("button");
   b.type = "button"; b.className = "pf"; b.dataset.k = k;
   b.innerHTML = `<span>${k}</span><i class="bar"></i>`;
-  longPress(b, () => openPrefabs(k), () => setMode(k === mode && k !== "7" ? "7" : k));
+  longPress(b, () => { if (isFollower()) toast("Only the main phone can edit prefabs"); else openPrefabs(k); }, () => pressPrefab(k));
   bar.appendChild(b);
 }
+const pfBtns = [...bar.querySelectorAll(".pf[data-k]")].map(b => ({ b, k: b.dataset.k, bar: b.querySelector(".bar") }));
+/* tapping a number: the main phone runs it; a joined phone with Prefabs allowed asks the main phone */
+function pressPrefab(k){
+  if (!isFollower()){ setMode(k === mode && k !== "7" ? "7" : k); return; }
+  if (!net.perms.prefabs){ toast("The main phone hasn't allowed prefabs on this phone"); return; }
+  if (!net.hostConn || !net.hostConn.open){ toast("Not connected to the main phone yet"); return; }
+  try { net.hostConn.send({ t: "prefab", k }); } catch {}
+}
 const gear = document.createElement("button");
-gear.type = "button"; gear.className = "pf"; gear.setAttribute("aria-label", "Edit prefabs");
+gear.type = "button"; gear.className = "pf gear"; gear.setAttribute("aria-label", "Edit prefabs");
 gear.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>`;
 gear.addEventListener("click", () => openPrefabs(mode === "7" ? "1" : mode));
 bar.appendChild(gear);
@@ -2306,24 +2400,34 @@ function setMode(k){
   pushState();
   if (live.on){ emit(); scheduleChat(); }
 }
+/* the prefab running now; on a joined phone that's the main phone's */
+function shownMode(){
+  if (!isFollower()) return mode;
+  const h = net.hostView;
+  return h && h.on && h.ends > Date.now() ? h.mode : "7";
+}
+let barShown = "";
 function renderBar(){
-  bar.querySelectorAll(".pf[data-k]").forEach(b => {
-    const k = b.dataset.k;
-    b.classList.toggle("on", k === mode);
-    b.setAttribute("aria-pressed", k === mode ? "true" : "false");
-    b.setAttribute("aria-label", `${k}: ${prefabs[k].name}`);
+  const m = shownMode();
+  barShown = m;
+  pfBtns.forEach(({ b, k }) => {
+    b.classList.toggle("on", k === m);
+    b.setAttribute("aria-pressed", k === m ? "true" : "false");
+    b.setAttribute("aria-label", `${k}: ${(isFollower() && net.prefabNames[k]) || prefabs[k].name}`);
   });
 }
 function renderProgress(){
   const now = Date.now();
   if (isFollower()){
-    const h = net.hostView;
-    $("modeLbl").textContent = h && h.on && h.ends > now ? h.mode : "";
+    const h = net.hostView, m = shownMode();
+    if (m !== barShown) renderBar();
+    pfBtns.forEach(p => { p.bar.style.width = p.k === m && m !== "7" && h && h.dur ? clamp((h.ends - now) / h.dur * 100, 0, 100) + "%" : "0"; });
+    $("modeLbl").textContent = m !== "7" ? m : "";
     return;
   }
   if (modeEnds && now >= modeEnds) setMode("7");
-  bar.querySelectorAll(".pf[data-k]").forEach(b => {
-    b.querySelector(".bar").style.width = (b.dataset.k === mode && modeDur) ? clamp((modeEnds - now) / modeDur * 100, 0, 100) + "%" : "0";
+  pfBtns.forEach(p => {
+    p.bar.style.width = (p.k === mode && modeDur) ? clamp((modeEnds - now) / modeDur * 100, 0, 100) + "%" : "0";
   });
   $("modeLbl").textContent = live.on && modeDur ? mode : "";
   const climbing = isClimbing();
@@ -2453,16 +2557,19 @@ function stopCam(force){
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = null; camFacing = null;
   feedWatchers();
+  clipSync();
 }
-/* one camera stream shared by the preview and the copy sent to the main phone */
+/* one camera stream shared by the preview, the clip recording and the copy sent to the main phone.
+   1080p for clips; the live copy to other phones is scaled down to 720p (see tuneSender). */
 async function getCam(facing){
   if (camLive() && camFacing === facing) return stream;
   if (stream) stream.getTracks().forEach(t => t.stop());
   stream = null;
-  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1280 }, height: { ideal: 720 } }, audio: false });
+  stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: { ideal: facing }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } }, audio: false });
   camFacing = facing;
   updateSendTrack();
   feedWatchers();
+  clipSync();
   return stream;
 }
 async function startCam(facing){
@@ -2486,7 +2593,7 @@ async function applySource(){
   const rv = $("remoteCam"), mv = $("mainCam");
   sendWatch();
   syncCamRequests();
-  clipAudioSync(); feedWatchers(); // clips and the PC follow the stream picture's sound and picture
+  clipSync(); feedWatchers(); // clips and the PC follow the stream picture
   if (cfg.layout === "chat"){ stopCam(); rv.hidden = true; mv.hidden = true; hideMsg(); $("flip").hidden = true; return; }
   const src = cfg.source, isCam = src === "back" || src === "front";
   if (isCam) cfg.lastCam = src; // where "This phone" goes back to
@@ -2533,136 +2640,156 @@ function showMedia(file){
 }
 
 /* ================= clips ================= */
-/* CLIP button -> last 30 to 45 seconds (picture + microphone) -> your PC folder.
-   A hidden canvas copies just the stream picture (no chat), at the camera's own shape, and the
-   microphone is added as sound. Recorders on it start every 15s and the oldest is dropped once a
-   newer one covers 30s, so one recorder always holds the last 30 to 45 seconds. CLIP stops that
-   recorder. Each clip waits on this phone (kept even if the app closes) until the PC saves it. */
-const CLIP_MS = 30000, CLIP_STAGGER = 15000;
+/* CLIP -> the last 30 seconds (camera + microphone) -> your PC folder.
+   The phone whose camera is the stream picture does the recording: the main phone with Back/Front
+   camera, or the joined phone the main phone picked for camera and sound. It records its own camera
+   (full quality, no chat), not the softer live copy other phones see. A new recording starts every
+   30s and two run at once, so the older one always holds 30 to 60 seconds; CLIP stops it and cuts it
+   down to the last 30 (mp4.js). Each clip waits on that phone (kept even if the app closes) until
+   the PC folder has saved it. Phones that are allowed to clip send their tap to the recording phone.
+   Quality: 1080p at 12 Mbps (close to the iPhone Camera app) with 192 kbps sound, so clips still
+   look sharp after TikTok/Instagram/YouTube compress them again. A 30s clip is about 45 MB. */
+const CLIP_KEEP = 30, CLIP_SPAN = 30000;
+const CLIP_V_BPS = 12000000, CLIP_A_BPS = 192000;
 const CLIP_TYPES_AV = ["video/mp4;codecs=avc1,mp4a.40.2", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm;codecs=vp8,opus", "video/webm"];
 const CLIP_TYPES_V = ["video/mp4;codecs=avc1", "video/mp4", "video/webm;codecs=vp9", "video/webm;codecs=vp8", "video/webm"];
-const clipSupported = !!(window.MediaRecorder && HTMLCanvasElement.prototype.captureStream);
-const clip = { on: false, gen: 0, seq: 0, tall: false, canvas: null, ctx: null, stream: null, mic: null, micWarned: false, mime: "", recs: [], tickT: null, raf: 0, lastDraw: 0, resyncT: null, pending: [] };
+const clipSupported = !!window.MediaRecorder;
+const clip = { on: false, broken: false, track: null, audio: null, src: null, shape: "", mic: null, micAsk: null, micWarned: false, mime: "", recs: [], tickT: null, pending: [] };
 const pad2 = n => String(n).padStart(2, "0");
 const fmtDur = ms => { const s = Math.round(ms / 1000); return `${Math.floor(s / 60)}:${pad2(s % 60)}`; };
 
 function clipMime(withSound){
   try { return (withSound ? CLIP_TYPES_AV : CLIP_TYPES_V).find(t => MediaRecorder.isTypeSupported(t)) || ""; } catch { return ""; }
 }
-
-const vidReady = v => v.readyState >= 2 && v.videoWidth > 0;
-/* what the stage is showing right now: { el, w, h, mirror }, or null for the background scene */
-function clipSource(){
-  const rv = $("remoteCam"), md = $("media"), mel = md.firstChild;
-  if (!rv.hidden && vidReady(rv)) return { el: rv, w: rv.videoWidth, h: rv.videoHeight, mirror: false };
-  if (!cam.hidden && vidReady(cam)) return { el: cam, w: cam.videoWidth, h: cam.videoHeight, mirror: cam.classList.contains("mirror") };
-  if (!md.hidden && mel){
-    if (mel.tagName === "VIDEO") return vidReady(mel) ? { el: mel, w: mel.videoWidth, h: mel.videoHeight, mirror: false } : null;
-    return mel.naturalWidth ? { el: mel, w: mel.naturalWidth, h: mel.naturalHeight, mirror: false } : null;
-  }
-  return null;
-}
-/* clips are upright when the camera picture is upright (or, with no camera, in full-screen layout) */
-function clipWantsTall(){
-  const s = clipSource();
-  return s ? s.h > s.w : cfg.layout === "irl";
+/* does this phone record the clips? */
+function clipRole(){
+  if (!clipSupported || clip.broken) return false;
+  if (isFollower()) return isSending();
+  return cfg.layout !== "chat" && (cfg.source === "back" || cfg.source === "front");
 }
 
-/* ---- microphone (sound for clips) ---- */
-async function getMic(){
-  if (clip.mic && clip.mic.getAudioTracks().some(t => t.readyState === "live")) return clip.mic;
+/* ---- microphone (sound for clips): plain sound, without the phone-call echo and noise filters ---- */
+function getMic(){
+  if (micTrack()) return Promise.resolve(clip.mic);
+  if (clip.micAsk) return clip.micAsk;
   clip.mic = null;
-  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return null;
-  try { clip.mic = await navigator.mediaDevices.getUserMedia({ audio: true, video: false }); }
-  catch {
-    if (!clip.micWarned){ clip.micWarned = true; toast("Microphone is off, so clips will have no sound"); }
-  }
-  return clip.mic;
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return Promise.resolve(null);
+  clip.micAsk = navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: false, noiseSuppression: false, autoGainControl: false }, video: false })
+    .then(s => { clip.mic = s; return s; })
+    .catch(() => {
+      if (!clip.micWarned){ clip.micWarned = true; toast("Microphone is off, so clips will have no sound"); }
+      return null;
+    })
+    .finally(() => { clip.micAsk = null; });
+  return clip.micAsk;
 }
 function stopMic(){
   if (clip.mic){ clip.mic.getTracks().forEach(t => t.stop()); clip.mic = null; }
+  if (lvl.src){ try { lvl.src.disconnect(); } catch {} }
+  lvl.src = null; lvl.out = null; lvl.mic = null;
   feedWatchers();
 }
 
+/* ---- leveler: evens out the sound in clips (and what the PC hears) ----
+   Cuts low rumble below 80 Hz (wind, handling), turns quiet parts up and loud parts down, and
+   catches peaks so shouting or a bang doesn't distort. It runs in an AudioContext, which iPhones
+   only start after a tap on the screen, so the context is started on a tap (on the phone that
+   records, or that offers its camera) and the plain microphone is used until it's running. */
+const lvl = { ctx: null, src: null, out: null, mic: null };
+function levelChain(c, input){
+  const hp = c.createBiquadFilter();
+  hp.type = "highpass"; hp.frequency.value = 80; hp.Q.value = 0.7;
+  const comp = c.createDynamicsCompressor(); // gentle: 3:1 above -24 dB, quiet parts come up about 10 dB
+  comp.threshold.value = -24; comp.knee.value = 10; comp.ratio.value = 3; comp.attack.value = 0.005; comp.release.value = 0.25;
+  const lim = c.createDynamicsCompressor(); // peak catcher just under full scale
+  lim.threshold.value = -3; lim.knee.value = 0; lim.ratio.value = 20; lim.attack.value = 0.001; lim.release.value = 0.1;
+  input.connect(hp); hp.connect(comp); comp.connect(lim);
+  return lim;
+}
+function wakeLevel(){
+  if (!clipSupported) return;
+  if (!lvl.ctx){
+    if (!(clipRole() || netCfg.sendCam || $("jCam").checked || $("jCam2").checked)) return;
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) return;
+    try { lvl.ctx = new AC(); } catch { return; }
+    // started, stopped by a phone call, back again: switch between leveled and plain sound
+    lvl.ctx.onstatechange = () => {
+      if (lvl.ctx.state === "suspended" || lvl.ctx.state === "interrupted") lvl.ctx.resume().catch(() => {});
+      clipSync(); feedWatchers(); updateSendTrack();
+    };
+  }
+  if (lvl.ctx.state !== "running" && lvl.ctx.state !== "closed") lvl.ctx.resume().catch(() => {});
+}
+document.addEventListener("pointerdown", wakeLevel);
+/* the leveled sound, or null while the leveler isn't running */
+function levelTrack(){
+  const raw = micTrack(), c = lvl.ctx;
+  if (!raw || !c || c.state !== "running") return null;
+  if (lvl.mic !== raw){
+    if (lvl.src){ try { lvl.src.disconnect(); } catch {} }
+    const src = c.createMediaStreamSource(new MediaStream([raw]));
+    const out = c.createMediaStreamDestination();
+    levelChain(c, src).connect(out);
+    Object.assign(lvl, { mic: raw, src, out });
+  }
+  return lvl.out.stream.getAudioTracks()[0] || null;
+}
+/* the sound clips and the PC get */
+const soundTrack = () => levelTrack() || micTrack();
+
 /* ---- the always-running recording ---- */
+/* upright or sideways: a turned phone restarts the recording so a clip keeps one shape */
+function vidShape(){
+  const s = clip.track && clip.track.getSettings ? clip.track.getSettings() : {};
+  const shown = cam.srcObject === stream && cam.videoWidth;
+  const w = shown ? cam.videoWidth : s.width || 0, h = shown ? cam.videoHeight : s.height || 0;
+  return w > h ? "wide" : "tall";
+}
 function clipSync(){
-  // a joined phone or PC doesn't record (and shouldn't ask for the microphone)
-  const allowed = clipSupported && cfg.layout !== "chat" && !isFollower() && netCfg.mode !== "follower";
-  $("clipBtn").hidden = !allowed;
-  const want = allowed && !document.hidden, tall = clipWantsTall();
-  if (want && clip.gen && clip.tall === tall) return;
+  renderClipBtn();
+  const vt = clipRole() && !document.hidden && camLive() ? stream.getVideoTracks()[0] : null;
+  if (!vt){
+    if (clip.on) clipStop();
+    if (!clipRole()) stopMic();
+    return;
+  }
+  if (clip.on && clip.track === vt && clip.audio === soundTrack()) return;
   clipStop();
-  // keep the microphone on while this phone sends its camera and sound to the main phone
-  if (!want){ if (!isSending()) stopMic(); return; }
-  clipStart(tall);
+  clipStart(vt);
 }
-function clipStart(tall){
-  const gen = clip.gen = ++clip.seq;
-  clip.tall = tall;
-  if (!clip.canvas){
-    const c = document.createElement("canvas");
-    c.style.cssText = "position:fixed;left:-10px;top:0;width:2px;height:2px;opacity:0;pointer-events:none";
-    c.setAttribute("aria-hidden", "true");
-    document.body.appendChild(c);
-    clip.canvas = c; clip.ctx = c.getContext("2d");
-  }
-  clip.canvas.width = tall ? 720 : 1280;
-  clip.canvas.height = tall ? 1280 : 720;
-  clipFrame();
-  try { clip.stream = clip.canvas.captureStream(30); } catch { return; }
-  clip.mime = clipMime(false);
+function clipStart(vt){
+  const at = soundTrack();
   clip.on = true;
-  clipAudioSync();
-  clip.raf = requestAnimationFrame(clipLoop);
-  clip.tickT = setInterval(clipTick, 500);
+  clip.track = vt; clip.audio = at;
+  clip.src = new MediaStream(at ? [vt, at] : [vt]);
+  clip.mime = clipMime(!!at);
+  clip.shape = vidShape();
+  clip.tickT = setInterval(clipTick, 1000);
   clipTick();
-  // this phone's microphone joins as soon as it's ready
-  getMic().then(() => {
-    feedWatchers(); // the PC's camera feed gets the sound too
-    if (gen === clip.gen) clipAudioSync();
-  });
-}
-/* the sound for clips: the friend's phone while its camera is the stream picture, otherwise
-   this phone's microphone */
-function clipAudioTrack(){
-  if (cfg.source === "remote" && net.remote){
-    const t = net.remote.stream.getAudioTracks().find(x => x.readyState === "live");
-    if (t) return t;
-  }
-  return micTrack();
-}
-/* switch the clip sound when it should come from somewhere else; the recording restarts so every
-   clip has one sound from start to end */
-function clipAudioSync(){
-  if (!clip.on || !clip.stream) return;
-  const want = clipAudioTrack();
-  const cur = clip.stream.getAudioTracks()[0] || null;
-  if (want === cur) return;
-  if (cur) clip.stream.removeTrack(cur);
-  if (want) clip.stream.addTrack(want);
-  clip.mime = clipMime(!!want);
-  clip.recs.forEach(dropRec); clip.recs = [];
-  clipTick();
+  // sound joins as soon as the microphone is ready (the recording restarts once for it)
+  if (!at) getMic().then(() => { feedWatchers(); clipSync(); });
 }
 function clipStop(){
-  clip.gen = 0; clip.on = false;
-  cancelAnimationFrame(clip.raf); clearInterval(clip.tickT);
+  clip.on = false;
+  clearInterval(clip.tickT);
   clip.recs.forEach(dropRec); clip.recs = [];
-  // stop the canvas picture; the microphone stays on for the next start
-  if (clip.stream){ clip.stream.getVideoTracks().forEach(t => t.stop()); clip.stream = null; }
+  clip.src = null; clip.track = null; clip.audio = null;
 }
 function startRec(){
   try {
-    const opts = { videoBitsPerSecond: 2500000, audioBitsPerSecond: 128000 };
+    const opts = { videoBitsPerSecond: CLIP_V_BPS, audioBitsPerSecond: CLIP_A_BPS };
     if (clip.mime) opts.mimeType = clip.mime;
-    const r = new MediaRecorder(clip.stream, opts);
+    const r = new MediaRecorder(clip.src, opts);
     const rec = { r, chunks: [], start: Date.now(), drop: false, done: null };
     r.ondataavailable = e => { if (!rec.drop && e.data && e.data.size) rec.chunks.push(e.data); };
     r.onstop = () => { if (rec.done) rec.done(); };
     r.start(1000);
     clip.recs.push(rec);
   } catch {
+    clip.broken = true;
     clipStop();
+    renderClipBtn();
     toast("This browser can't record clips");
   }
 }
@@ -2672,30 +2799,41 @@ function dropRec(rec){
 }
 function clipTick(){
   if (!clip.on) return;
+  if (clip.track.readyState !== "live" || vidShape() !== clip.shape){ clipStop(); clipSync(); return; }
   const now = Date.now(), recs = clip.recs;
-  if (!recs.length || now - recs[recs.length - 1].start >= CLIP_STAGGER) startRec();
-  while (recs.length > 1 && now - recs[1].start >= CLIP_MS) dropRec(recs.shift());
+  if (!recs.length || now - recs[recs.length - 1].start >= CLIP_SPAN) startRec();
+  while (recs.length > 2) dropRec(recs.shift());
 }
 
-/* ---- CLIP button ---- */
-function takeClip(){
-  if (!clip.on){ toast("Clips are still starting. Try again in a moment."); return; }
+/* ---- cutting a clip (on the recording phone). here = CLIP was tapped on this phone ---- */
+function takeClip(here){
+  if (!clip.on){ clipNews(clipRole() ? "Clips are still starting. Try again in a moment." : "Clips aren't recording on the camera phone right now", here); return; }
   const rec = clip.recs[0], now = Date.now();
-  if (!rec || now - rec.start < 1500){ toast("Nothing to clip yet"); return; }
+  if (!rec || now - rec.start < 1500){ clipNews("Nothing to clip yet", here); return; }
   clip.recs.shift();
   clipTick();
   const dur = now - rec.start;
-  $("clipBtn").classList.add("busy");
+  setClipBusy(true);
   rec.done = () => {
-    $("clipBtn").classList.remove("busy");
+    setClipBusy(false);
     const type = (rec.r.mimeType || clip.mime || "video/webm").split(";")[0];
-    newClip(new Blob(rec.chunks, { type }), dur);
+    finishClip(new Blob(rec.chunks, { type }), dur, here);
   };
   try { rec.r.requestData(); } catch {}
   try { rec.r.stop(); } catch { rec.done(); }
 }
-function newClip(blob, dur){
-  if (!blob.size){ toast("That clip came out empty. Try again."); return; }
+async function finishClip(blob, dur, here){
+  if (!blob.size){ clipNews("That clip came out empty. Try again.", here); return; }
+  // cut it to the last 30 seconds and make it a normal MP4: less to send, and players can seek it
+  if (/mp4/.test(blob.type) && window.chatlineMp4){
+    try {
+      const out = chatlineMp4.fixMp4(await blob.arrayBuffer(), CLIP_KEEP);
+      if (out){ blob = new Blob([out.data], { type: "video/mp4" }); dur = out.dur * 1000; }
+    } catch {}
+  }
+  newClip(blob, dur, here);
+}
+function newClip(blob, dur, here){
   const t = new Date();
   const ext = blob.type.includes("mp4") ? "mp4" : "webm";
   const name = `chatline-clip-${t.getFullYear()}${pad2(t.getMonth() + 1)}${pad2(t.getDate())}-${pad2(t.getHours())}${pad2(t.getMinutes())}${pad2(t.getSeconds())}.${ext}`;
@@ -2703,57 +2841,72 @@ function newClip(blob, dur){
   clip.pending.push(it);
   kvPutClip(it);
   renderClipCount();
-  if (sendClipToFolders(it)) toast(`Clipped ${fmtDur(dur)}. Sending to your PC folder…`);
+  if (sendClipToFolders(it)) clipNews(`Clipped ${fmtDur(dur)}. Sending to your PC folder…`, here);
   else {
     // the PC can only connect to a room, so make sure this phone has one going
     if (net.role === "solo") startHost();
-    toast(`Clipped ${fmtDur(dur)}. It goes to your PC folder when the PC connects.`);
+    clipNews(`Clipped ${fmtDur(dur)}. It goes to your PC folder when the PC connects.`, here);
   }
 }
-/* the red number on CLIP = clips waiting to reach the PC folder */
-function renderClipCount(){
+/* the PC folder saved a clip: forget it */
+function clipSaved(id){
+  if (!clip.pending.some(it => it.id === id)) return;
+  clip.pending = clip.pending.filter(it => it.id !== id);
+  kvDelClip(id);
+  renderClipCount();
+  clipNews("Clip saved to your PC folder");
+}
+/* clip messages show on the main phone and on phones allowed to clip. A joined camera phone only
+   shows them when CLIP was tapped on it, so they don't end up in what it's screen-recording. */
+function clipNews(msg, here){
+  if (msg && (!isFollower() || here)) toast(msg);
   const n = clip.pending.length;
-  $("clipCount").hidden = !n; $("clipCount").textContent = n;
+  if (net.role === "host") newsOut(msg, n, null);
+  else if (isFollower() && net.hostConn && net.hostConn.open){ try { net.hostConn.send({ t: "clipst", msg, n }); } catch {} }
 }
-$("clipBtn").addEventListener("click", takeClip);
 
-/* ---- drawing the stream picture onto the clip canvas ---- */
-function clipLoop(ts){
-  if (!clip.on) return;
-  clip.raf = requestAnimationFrame(clipLoop);
-  if (ts - clip.lastDraw < 30) return;
-  clip.lastDraw = ts;
-  clipFrame();
+/* ---- CLIP button ---- */
+/* who gets one: the main phone while a camera is the stream picture, and joined phones the main
+   phone allowed to clip */
+function canClip(){
+  if (isFollower()) return net.perms.clip;
+  return clipRole() || (net.role === "host" && cfg.source === "remote");
 }
-function coverDraw(src, sw, sh, mirror){
-  if (!sw || !sh) return false;
-  const x = clip.ctx, W = clip.canvas.width, H = clip.canvas.height;
-  const s = Math.max(W / sw, H / sh), dw = sw * s, dh = sh * s;
-  x.save();
-  if (mirror){ x.translate(W, 0); x.scale(-1, 1); }
-  try { x.drawImage(src, (W - dw) / 2, (H - dh) / 2, dw, dh); } catch { x.restore(); return false; }
-  x.restore();
-  return true;
+function renderClipBtn(){
+  const show = canClip();
+  $("clipBtn").hidden = !show;
+  $("clipBtn2").hidden = !show || cfg.layout !== "chat";
+  renderClipCount();
 }
-function clipFrame(){
-  const x = clip.ctx, W = clip.canvas.width, H = clip.canvas.height;
-  x.fillStyle = "#000"; x.fillRect(0, 0, W, H);
-  const s = clipSource();
-  if (!s || !coverDraw(s.el, s.w, s.h, s.mirror)) drawScene(x, W, H);
-  // camera turned or source changed shape: restart the recorders at the new shape
-  if (clip.on && clipWantsTall() !== clip.tall && !clip.resyncT){
-    clip.resyncT = setTimeout(() => { clip.resyncT = null; clipSync(); }, 1000);
+/* the red number on CLIP = clips waiting to reach the PC folder (on the camera phone, if it's another one) */
+function renderClipCount(){
+  const n = clip.pending.length + (clipRole() ? 0 : net.clipWait);
+  ["clipCount", "clipCount2"].forEach(id => { $(id).hidden = !n; $(id).textContent = n; });
+}
+function setClipBusy(on){ ["clipBtn", "clipBtn2"].forEach(id => $(id).classList.toggle("busy", on)); }
+function pressClip(){
+  if (clipRole()){ takeClip(true); return; }
+  if (isFollower()){
+    if (!net.hostConn || !net.hostConn.open){ toast("Not connected to the main phone yet"); return; }
+    try { net.hostConn.send({ t: "clip" }); } catch {}
+    return;
   }
+  routeClip(null);
 }
-function drawScene(x, W, H){
-  x.fillStyle = "#120f1c"; x.fillRect(0, 0, W, H);
-  const d = Math.sin(Date.now() / 7000) * 0.04, m = Math.max(W, H);
-  [[.25 + d, .35, .5, "rgba(168,115,255,.55)"], [.75 - d, .65, .45, "rgba(255,92,138,.35)"], [.6, .2 + d, .6, "rgba(60,170,255,.25)"]].forEach(([cx, cy, r, c]) => {
-    const g = x.createRadialGradient(cx * W, cy * H, 0, cx * W, cy * H, r * m);
-    g.addColorStop(0, c); g.addColorStop(1, "rgba(0,0,0,0)");
-    x.fillStyle = g; x.fillRect(0, 0, W, H);
-  });
+/* main phone: clip on whichever phone is recording. from = the joined phone that asked (or null) */
+function routeClip(from){
+  if (clipRole()){ takeClip(!from); return; }
+  const say = msg => {
+    if (!from){ toast(msg); return; }
+    try { from.send({ t: "clipst", msg, n: net.clipWait }); } catch {}
+  };
+  if (cfg.source !== "remote"){ say("Clips record the camera. Pick a camera for the stream picture first."); return; }
+  const c = pickedConn();
+  if (!c || !c.conn.open){ say("The camera phone isn't connected, so nothing was clipped"); return; }
+  try { c.conn.send({ t: "clipnow" }); } catch {}
 }
+$("clipBtn").addEventListener("click", pressClip);
+$("clipBtn2").addEventListener("click", pressClip);
 
 /* keep the screen awake and the camera running */
 let wake = null;
@@ -2924,6 +3077,7 @@ $("prefabForm").addEventListener("submit", e => {
   prefabs = draft;
   store.set("chatline2.prefabs", prefabs);
   parseAll(); closeSheets(); renderBar();
+  if (net.role === "host") for (const c of net.conns.values()) sendPerms(c); // new prefab names
   if (live.on) scheduleChat();
   toast("Prefabs saved");
 });
@@ -3000,6 +3154,8 @@ function iceConfig(){
 function newPeer(id){
   if (!window.Peer){ setNetStatus("Couldn't load the connection tool. Check your internet and reopen the app."); return null; }
   const opts = { config: iceConfig(), debug: 0 };
+  // the room code goes with this phone's lasting key (see netCfg.token)
+  if (id) opts.token = netCfg.token;
   return id ? new Peer(id, opts) : new Peer(opts);
 }
 function retryPeer(p, fn){
@@ -3008,10 +3164,24 @@ function retryPeer(p, fn){
   clearTimeout(net.retryT);
   net.retryT = setTimeout(fn, 4000);
 }
-function watchServer(p){
-  p.on("disconnected", () => setTimeout(() => {
+/* The PeerJS server only introduces phones to each other; once connected, phones talk directly and
+   don't need it. Its connection drops now and then (mostly on mobile data), so just reconnect to it
+   with the same id: the server takes us straight back and the phones never notice. (Starting over
+   with a new Peer would cut every phone off and lock the room code until the server timed it out.) */
+function watchServer(p, rebuild){
+  p.on("open", () => { p.cl_opened = true; p.cl_heals = 0; });
+  p.on("disconnected", () => healPeer(p, rebuild));
+}
+function healPeer(p, rebuild){
+  if (net.peer !== p || p.destroyed || p.cl_healing) return;
+  if (!p.cl_opened){ retryPeer(p, rebuild); return; } // never got onto the server: start over
+  p.cl_healing = true;
+  const wait = Math.min(15000, 1000 * 2 ** (p.cl_heals = (p.cl_heals || 0) + 1));
+  clearTimeout(net.healT);
+  net.healT = setTimeout(() => {
+    p.cl_healing = false;
     if (net.peer === p && !p.destroyed && p.disconnected){ try { p.reconnect(); } catch {} }
-  }, 2000));
+  }, wait);
 }
 function setNetStatus(t){ net.status = t; renderNet(); }
 function broadcast(m){
@@ -3021,7 +3191,7 @@ function broadcast(m){
 function hostState(){
   return { t: "state", streamer: cfg.streamer, title: cfg.title, category: cfg.category, tags: cfg.tags,
            on: live.on, up: Date.now() - live.startedAt, v: Math.round(vs.now),
-           mode, left: modeEnds ? Math.max(0, modeEnds - Date.now()) : 0 };
+           mode, left: modeEnds ? Math.max(0, modeEnds - Date.now()) : 0, dur: modeDur };
 }
 function pushState(){ if (net.role === "host" && net.conns.size) broadcast(hostState()); }
 
@@ -3040,16 +3210,21 @@ function openHostPeer(){
   const p = newPeer(peerId(netCfg.hostCode));
   if (!p) return;
   net.peer = p;
-  watchServer(p);
+  watchServer(p, openHostPeer);
   p.on("open", () => { if (net.peer === p) setNetStatus(net.conns.size ? "Room is on" : "Room is on. Waiting for phones…"); });
   p.on("connection", conn => {
     conn.on("open", () => {
       const md = conn.metadata || {};
+      const dev = String(md.dev || "");
+      // the same phone coming back: drop its old, dead link first (and ask it again to feed the PC)
+      if (dev) for (const old of [...net.conns.values()]) if (old.dev === dev && old.conn !== conn){ try { old.conn.close(); } catch {} old.gone(); }
+      if (dev) for (const p of net.conns.values()) if (!p.dev && p.directDev === dev) p.directDev = "";
       // dev: a joined phone's lasting id (the PC page has none); avail: it lets this phone use its camera
-      net.conns.set(conn.peer, { conn, avail: false, clips: false, dev: String(md.dev || ""), name: String(md.name || "").slice(0, 25) || "phone", seen: Date.now(), gone: () => gone() });
+      net.conns.set(conn.peer, { conn, avail: false, clips: false, dev, name: String(md.name || "").slice(0, 25) || "phone", seen: Date.now(), gone: () => gone() });
       try { conn.send({ t: "hello", hist: net.history.slice(-30), state: hostState() }); } catch {}
+      if (dev){ sendPerms(net.conns.get(conn.peer)); sendPc(conn); }
       setNetStatus("Room is on");
-      toast(md.dev ? "A phone connected" : "Your PC connected");
+      toast(dev ? "A phone connected" : "Your PC connected");
       renderNet();
     });
     conn.on("data", d => onHostData(conn, d));
@@ -3060,7 +3235,10 @@ function openHostPeer(){
         if (c.mainCall){ try { c.mainCall.close(); } catch {} }
         // its camera stops with it (instead of freezing on the last picture)
         if (net.remote && net.remote.call.peer === conn.peer){ const k = net.remote.call; clearRemoteCam(); try { k.close(); } catch {} }
-        if (c.dev && c.dev === netCfg.pick && cfg.source === "remote") toast(`${c.name}'s phone disconnected. Pick another camera in Connect phones.`);
+        if (c.dev && c.dev === netCfg.pick && cfg.source === "remote") toast(`${c.name}'s phone disconnected. It reconnects by itself when it can.`);
+        if (!c.dev && c.clips) sendPc(); // the PC folder went away: tell the camera phone
+        if (!c.dev && c.directDev){ const cam = connByDev(c.directDev); if (cam){ try { cam.conn.send({ t: "feedpc", id: conn.peer, on: false }); } catch {} } }
+        syncPcFeed();
         renderNet();
       }
     };
@@ -3078,16 +3256,63 @@ function openHostPeer(){
   });
   p.on("error", err => {
     if (net.peer !== p) return;
-    if (err.type === "unavailable-id"){ setNetStatus("Room code still in use. Retrying…"); retryPeer(p, openHostPeer); }
-    else if (NET_RETRY.includes(err.type)){ setNetStatus("Connection lost. Retrying…"); retryPeer(p, openHostPeer); }
+    if (err.type === "unavailable-id" && !p.cl_opened){ setNetStatus("Room code still in use. Retrying…"); retryPeer(p, openHostPeer); }
+    else if (NET_RETRY.includes(err.type) || err.type === "unavailable-id"){
+      setNetStatus(net.conns.size ? "Room is on · reconnecting to the server (phones stay connected)" : "Reconnecting to the server…");
+      healPeer(p, openHostPeer);
+    }
     else if (err.type === "browser-incompatible") setNetStatus("This browser can't connect phones. Use Safari.");
   });
+}
+/* ---- what each joined phone may do (main phone decides, per phone, kept between visits) ---- */
+const permFor = dev => Object.assign({ clip: false, prefabs: false }, netCfg.perms[dev] || {});
+function sendPerms(c){
+  if (!c || !c.dev || !c.conn.open) return;
+  const names = {};
+  for (const k of KEYS) names[k] = prefabs[k].name;
+  try { c.conn.send(Object.assign({ t: "perms", names }, permFor(c.dev))); } catch {}
+}
+function setPerm(dev, key, on){
+  netCfg.perms[dev] = Object.assign(permFor(dev), { [key]: on });
+  saveNet();
+  for (const c of net.conns.values()) if (c.dev === dev) sendPerms(c);
+  renderNet();
+}
+/* main phone: pass clip messages on to joined phones that may clip (not back to the one that sent it) */
+function newsOut(msg, n, from){
+  for (const c of net.conns.values()){
+    if (c.dev && c.conn !== from && c.conn.open && permFor(c.dev).clip){ try { c.conn.send({ t: "clipst", msg, n }); } catch {} }
+  }
+}
+/* tell joined phones where the PC clip folder is, so the camera phone can send its clips straight there */
+function pcInfo(){
+  const c = [...net.conns.values()].find(x => !x.dev && x.clips && x.conn.open);
+  return { t: "pc", id: c ? c.conn.peer : "" };
+}
+function sendPc(to){
+  if (net.role !== "host") return;
+  const m = pcInfo();
+  if (to){ try { to.send(m); } catch {} return; }
+  for (const c of net.conns.values()) if (c.dev && c.conn.open){ try { c.conn.send(m); } catch {} }
 }
 function onHostData(conn, d){
   if (!d || typeof d !== "object") return;
   const from = net.conns.get(conn.peer);
   if (from){ from.seen = Date.now(); if (d.t === "ping"){ from.pinged = true; return; } }
-  if (d.t === "say"){
+  if (d.t === "prefab"){
+    // a joined phone tapped a number
+    const k = String(d.k || "");
+    if (from && permFor(from.dev).prefabs && KEYS.includes(k)) setMode(k === mode && k !== "7" ? "7" : k);
+  } else if (d.t === "clip"){
+    if (from && permFor(from.dev).clip) routeClip(conn);
+  } else if (d.t === "clipst"){
+    // news from the camera phone's clips
+    net.clipWait = Math.max(0, +d.n || 0);
+    renderClipCount();
+    const msg = String(d.msg || "").slice(0, 120);
+    if (msg) toast(msg);
+    newsOut(msg, net.clipWait, conn);
+  } else if (d.t === "say"){
     const name = String(d.name || "").replace(/\s+/g, "_").slice(0, 25) || "viewer";
     const text = String(d.text || "").trim().slice(0, 300);
     if (text) chatLine(name, text, false);
@@ -3095,27 +3320,29 @@ function onHostData(conn, d){
     const c = net.conns.get(conn.peer);
     if (c){ c.avail = !!d.on; syncCamRequests(); if (cfg.source === "remote") applySource(); renderNet(); }
   } else if (d.t === "watch"){
+    // rec: the PC is recording the whole stream (full-quality feed); live: the PC has a picture
     const c = net.conns.get(conn.peer);
-    if (c){ c.watch = !!d.on; c.sound = !!d.sound; feedWatcher(c); renderNet(); }
+    if (c){
+      const wasRec = !!c.rec;
+      c.watch = !!d.on; c.sound = !!d.sound; c.rec = !!d.rec; c.live = !!d.live;
+      if (c.live) c.liveSeen = Date.now();
+      if (c.rec !== wasRec && c.mainCall) tuneSender(c.mainCall, !c.dev && c.rec);
+      syncPcFeed(); feedWatcher(c); renderNet();
+    }
   } else if (d.t === "clipdir"){
     const c = net.conns.get(conn.peer);
     if (c){
       const was = c.clips;
       c.clips = !!d.on; renderNet();
+      if (c.clips !== was) sendPc();
       if (c.clips){
         if (!was) toast("PC clip folder connected");
         // clips taken while the PC wasn't ready go now, oldest first (again, if the PC wasn't able to save them)
-        clip.pending.forEach(it => { if (!was && it.sentTo) it.sentTo.delete(c.conn); sendClip(c, it); });
+        clip.pending.forEach(it => { if (!was && it.sentTo) it.sentTo.delete(c.conn); sendClip(c.conn, it); });
       }
     }
   } else if (d.t === "clipsaved"){
-    const id = String(d.id || "");
-    if (clip.pending.some(it => it.id === id)){
-      clip.pending = clip.pending.filter(it => it.id !== id);
-      kvDelClip(id);
-      renderClipCount();
-      toast("Clip saved to your PC folder");
-    }
+    clipSaved(String(d.id || ""));
   }
 }
 
@@ -3141,13 +3368,51 @@ function feedVideoTrack(){
   }
   return camLive() ? stream.getVideoTracks()[0] : null;
 }
+/* the sound watchers hear: the friend's phone while its camera is the stream picture, otherwise
+   this phone's microphone */
+function feedAudioTrack(){
+  if (cfg.source === "remote" && net.remote){
+    const t = net.remote.stream.getAudioTracks().find(x => x.readyState === "live");
+    if (t) return t;
+  }
+  return soundTrack();
+}
+/* The live picture sent to other phones and the PC: at most 720p and 2 Mbps, so it holds up on
+   mobile data and leaves room for clips (those are recorded on the camera phone in full quality).
+   While the PC is recording the whole stream, its feed goes up to full 1080p and 8 Mbps.
+   Encodings only exist once the call is set up, so try a few times. */
+const LIVE_Q = { bps: 2000000, long: 1280 }, REC_Q = { bps: 8000000, long: 1920 };
+function tuneSender(call, hq){
+  const q = hq ? REC_Q : LIVE_Q;
+  let tries = 0;
+  const go = () => {
+    const pc = call && call.peerConnection;
+    if (!pc || pc.connectionState === "closed") return;
+    const s = pc.getSenders().find(x => x.track && x.track.kind === "video");
+    let p = null;
+    try { p = s && s.getParameters(); } catch {}
+    if (!p || !p.encodings || !p.encodings.length){ if (++tries < 8) setTimeout(go, 1000); return; }
+    const st = s.track.getSettings ? s.track.getSettings() : {};
+    const long = Math.max(st.width || 0, st.height || 0);
+    p.encodings[0].maxBitrate = q.bps;
+    p.encodings[0].maxFramerate = 30;
+    p.encodings[0].scaleResolutionDownBy = long > q.long ? long / q.long : 1;
+    s.setParameters(p).catch(() => {});
+  };
+  setTimeout(go, 500);
+}
 function feedWatcher(c){
-  const t = feedVideoTrack();
-  if (!c.watch || !t || !net.peer || net.peer.destroyed || !c.conn.open){
+  // the PC gets the camera straight from the camera phone (see syncPcFeed)
+  if (c.directDev){
     if (c.mainCall){ const k = c.mainCall; c.mainCall = null; try { k.close(); } catch {} }
     return;
   }
-  const a = c.sound ? clipAudioTrack() : null;
+  const t = feedVideoTrack();
+  if (!c.watch || !t || !net.peer || net.peer.destroyed || net.peer.disconnected || !c.conn.open){
+    if (c.mainCall && (!c.watch || !t || !c.conn.open)){ const k = c.mainCall; c.mainCall = null; try { k.close(); } catch {} }
+    return;
+  }
+  const a = c.sound ? feedAudioTrack() : null;
   if (callUp(c.mainCall)){
     const pc = c.mainCall.peerConnection;
     const vs = senderFor(pc, "video"), as = senderFor(pc, "audio");
@@ -3164,49 +3429,140 @@ function feedWatcher(c){
   if (!call) return;
   call.startedAt = Date.now();
   c.mainCall = call;
+  tuneSender(call, !c.dev && c.rec);
   const end = () => { if (c.mainCall === call) c.mainCall = null; };
   call.on("close", end); call.on("error", end);
 }
 function feedWatchers(){ if (net.role === "host") for (const c of net.conns.values()) feedWatcher(c); }
+
+/* ---- the PC's camera feed ----
+   When a joined phone is the camera, it sends its camera straight to the PC: one hop over mobile
+   data instead of two, compressed once instead of twice, and it keeps going if this phone drops
+   for a moment. If that doesn't come through within 20s, this phone passes the picture on instead.
+   (Phones watching "Main phone's camera" always get it from this phone.) */
+const connByDev = dev => [...net.conns.values()].find(x => x.dev === dev) || null;
+function directCam(){
+  const c = cfg.source === "remote" ? pickedConn() : null;
+  return c && c.avail && c.conn.open ? c : null;
+}
+function syncPcFeed(){
+  if (net.role !== "host") return;
+  const cam = directCam();
+  for (const c of net.conns.values()){
+    if (c.dev) continue;
+    const want = cam && c.watch && !(c.relayUntil > Date.now()) ? cam.dev : "";
+    const hq = !!c.rec;
+    if (c.directDev === want && c.directHq === hq) continue;
+    if (c.directDev && c.directDev !== want){
+      const old = connByDev(c.directDev);
+      if (old){ try { old.conn.send({ t: "feedpc", id: c.conn.peer, on: false }); } catch {} }
+    }
+    if (want){
+      try { cam.conn.send({ t: "feedpc", id: c.conn.peer, on: true, hq }); } catch {}
+      if (c.directDev !== want) c.directAt = Date.now();
+    }
+    c.directDev = want; c.directHq = hq;
+    feedWatcher(c);
+  }
+}
 setInterval(feedWatchers, 5000);
 
-/* heartbeat: joined phones and the PC check in every 3s. A phone that dies (battery, no signal)
-   never says goodbye, so the main phone drops anything that's been quiet for 12s. */
-const HEARTBEAT_MS = 3000, QUIET_MS = 12000;
+/* heartbeat, both ways, every 3s. A phone that dies (battery, no signal) never says goodbye and the
+   browser can take a long time to notice, so whichever side hasn't heard from the other for 15s
+   drops the link (a joined phone then connects again by itself). */
+const HEARTBEAT_MS = 3000, QUIET_MS = 15000, REASK_MS = 8000;
+const remoteUp = () => !!net.remote && callUp(net.remote.call) && net.remote.stream.getVideoTracks().some(t => t.readyState === "live");
 setInterval(() => {
-  if (isFollower() && net.hostConn && net.hostConn.open){ try { net.hostConn.send({ t: "ping" }); } catch {} }
-  if (net.role !== "host") return;
   const now = Date.now();
+  if (isFollower()){
+    const h = net.hostConn;
+    if (h && h.open){
+      try { h.send({ t: "ping" }); } catch {}
+      if (net.hostPinged && now - net.hostSeen > QUIET_MS && h.cl_lost) h.cl_lost();
+    }
+    // clips waiting for the PC: (re)open the link straight to it
+    if (clip.pending.length && net.pcId && !(net.pcLink && net.pcLink.open)) pcLink();
+    // the camera feed to the PC dropped (or never started): call it again
+    if (net.feedPc && isSending() && camLive() && !callUp(net.pcCall) && (!net.pcCall || now - net.pcCall.startedAt > 15000)) startPcFeed();
+    return;
+  }
+  if (net.role !== "host") return;
+  broadcast({ t: "ping" });
   for (const c of [...net.conns.values()]){
     if (c.pinged && now - c.seen > QUIET_MS){ try { c.conn.close(); } catch {} c.gone(); }
   }
+  // a PC that should get the camera straight from the camera phone but hasn't had a picture for 20s:
+  // pass it on from this phone for 2 minutes, then try straight again
+  for (const p of net.conns.values()){
+    if (!p.dev && p.directDev && p.watch && !p.live && now - Math.max(p.directAt || 0, p.liveSeen || 0) > 20000) p.relayUntil = now + 120000;
+  }
+  syncPcFeed();
+  // the picked phone's camera stopped coming through (dropped or frozen) for a while: ask it to call again
+  const c = cfg.source === "remote" ? pickedConn() : null;
+  if (c && c.avail && c.conn.open && !remoteUp()){
+    c.downAt = c.downAt || now;
+    if (now - c.downAt > REASK_MS && now - (c.askedAt || 0) > REASK_MS){
+      c.asked = true; c.askedAt = now;
+      try { c.conn.send({ t: "camreq", on: true, again: true }); } catch {}
+    }
+  } else if (c) c.downAt = 0;
 }, HEARTBEAT_MS);
 
 /* ---- clips to a folder on a PC ----
-   The PC joins this phone's room and picks a folder once. The phone sends each clip in pieces,
-   the PC writes the file into the folder and says so, and only then does the phone forget it. */
-const CLIP_PART = 256 * 1024;
+   The PC joins the main phone's room and picks a folder once. The recording phone sends each clip
+   in pieces (the main phone over its own link to the PC; a joined camera phone straight to the PC),
+   the PC writes the file and says so, and only then does the phone forget it. Pieces go out a bit
+   at a time (about 6 Mbps, never much waiting in line) so chat and check-ins keep flowing while a
+   clip uploads over mobile data; a 30s clip takes about a minute. */
+const CLIP_PART = 64 * 1024, CLIP_SEND_BPS = 6000000, CLIP_QUEUE = 512 * 1024;
+const sleep = ms => new Promise(r => setTimeout(r, ms));
 function sendClipToFolders(it){
-  if (net.role !== "host") return false;
-  let any = false;
-  for (const c of net.conns.values()) if (c.clips && c.conn.open){ sendClip(c, it); any = true; }
-  return any;
-}
-async function sendClip(c, it){
-  // once per connection; a reconnected PC is a new connection and gets it again
-  if (!it.sentTo) it.sentTo = new WeakSet();
-  if (it.sentTo.has(c.conn)) return;
-  it.sentTo.add(c.conn);
-  try {
-    const buf = await it.blob.arrayBuffer();
-    const n = Math.max(1, Math.ceil(buf.byteLength / CLIP_PART));
-    for (let i = 0; i < n; i++){
-      c.conn.send({ t: "clippart", id: it.id, name: it.name, type: it.type, i, n, data: buf.slice(i * CLIP_PART, (i + 1) * CLIP_PART) });
-    }
-  } catch {
-    it.sentTo.delete(c.conn);
-    toast("Couldn't send the clip to your PC");
+  if (net.role === "host"){
+    let any = false;
+    for (const c of net.conns.values()) if (c.clips && c.conn.open){ sendClip(c.conn, it); any = true; }
+    return any;
   }
+  if (isFollower() && net.pcId){
+    const l = pcLink();
+    if (l && l.open) sendClip(l, it); // otherwise it goes when the link opens
+    return true;
+  }
+  return false;
+}
+/* one clip at a time per link, once per link (a reconnected PC is a new link and gets it again) */
+function sendClip(conn, it){
+  if (!it.sentTo) it.sentTo = new WeakSet();
+  if (it.sentTo.has(conn)) return;
+  it.sentTo.add(conn);
+  conn.cl_queue = (conn.cl_queue || Promise.resolve()).then(() => sendParts(conn, it)).catch(() => { it.sentTo.delete(conn); });
+}
+async function sendParts(conn, it){
+  if (!clip.pending.includes(it)) return; // saved meanwhile
+  const buf = await it.blob.arrayBuffer();
+  const n = Math.max(1, Math.ceil(buf.byteLength / CLIP_PART));
+  const t0 = Date.now();
+  for (let i = 0; i < n; i++){
+    while (conn.open && (conn.bufferSize > 0 || (conn.dataChannel && conn.dataChannel.bufferedAmount > CLIP_QUEUE)
+      || Date.now() - t0 < i * CLIP_PART * 8000 / CLIP_SEND_BPS)) await sleep(40);
+    if (!conn.open) throw new Error("link closed");
+    conn.send({ t: "clippart", id: it.id, name: it.name, type: it.type, i, n, data: buf.slice(i * CLIP_PART, (i + 1) * CLIP_PART) });
+  }
+}
+/* joined camera phone -> PC page, only for clips. The main phone says which id the PC has. */
+function pcLink(){
+  const l = net.pcLink;
+  if (l && l.peer === net.pcId && (l.open || Date.now() - l.cl_at < 15000)) return l;
+  if (l){ net.pcLink = null; try { l.close(); } catch {} }
+  if (!net.pcId || !net.peer || net.peer.destroyed || !net.peer.open) return null;
+  const c = net.peer.connect(net.pcId, { reliable: true, metadata: { role: "clips", dev: netCfg.dev } });
+  if (!c) return null;
+  c.cl_at = Date.now();
+  net.pcLink = c;
+  c.on("open", () => clip.pending.forEach(it => sendClip(c, it)));
+  c.on("data", d => { if (d && d.t === "clipsaved") clipSaved(String(d.id || "")); });
+  const gone = () => { if (net.pcLink === c) net.pcLink = null; };
+  c.on("close", gone); c.on("error", gone);
+  return c;
 }
 
 /* the phone's clips waiting for the PC, kept on the phone even if the app closes */
@@ -3257,8 +3613,10 @@ function syncCamRequests(){
     const want = c.avail && c.dev === netCfg.pick && cfg.source === "remote";
     if (c.asked === want) continue;
     c.asked = want;
+    if (want) c.askedAt = Date.now();
     try { c.conn.send({ t: "camreq", on: want }); } catch {}
   }
+  syncPcFeed();
 }
 function pickCamera(dev){
   const c = dev ? [...net.conns.values()].find(x => x.dev === dev) : null;
@@ -3273,6 +3631,7 @@ function pickCamera(dev){
   if (dev) cfg.source = "remote";
   else if (cfg.source === "remote") cfg.source = cfg.lastCam || "back";
   store.set("chatline2.cfg", cfg);
+  for (const p of net.conns.values()) if (!p.dev) p.relayUntil = 0; // a new camera: try it straight to the PC
   applySource();
   renderNet();
   toast(dev ? `Using ${netCfg.pickName}'s camera and sound` : "Using this phone's camera and sound");
@@ -3309,8 +3668,9 @@ function openFollowerPeer(){
   const p = newPeer();
   if (!p) return;
   net.peer = p;
-  watchServer(p);
-  p.on("open", () => { if (net.peer === p) connectToHost(); });
+  watchServer(p, openFollowerPeer);
+  // (also fires when it's back on the server after a drop; the link to the main phone usually survived)
+  p.on("open", () => { if (net.peer === p && !(net.hostConn && net.hostConn.open)) connectToHost(); });
   // the main phone's camera, when this phone asked to see it
   p.on("call", call => {
     if (!call.metadata || call.metadata.role !== "main"){ try { call.close(); } catch {} return; }
@@ -3330,8 +3690,15 @@ function openFollowerPeer(){
   });
   p.on("error", err => {
     if (net.peer !== p) return;
-    if (err.type === "peer-unavailable"){ setNetStatus("Can't find that room. Is it on? Retrying…"); scheduleRejoin(); }
-    else if (NET_RETRY.includes(err.type)){ setNetStatus("Connection lost. Retrying…"); retryPeer(p, openFollowerPeer); }
+    if (err.type === "peer-unavailable"){
+      // that's the main phone, or the PC page we tried to send clips to
+      if (net.hostConn && net.hostConn.open) return;
+      setNetStatus("Can't find that room. Is it on? Retrying…"); scheduleRejoin();
+    }
+    else if (NET_RETRY.includes(err.type) || err.type === "unavailable-id"){
+      if (!(net.hostConn && net.hostConn.open)) setNetStatus("Reconnecting…");
+      healPeer(p, openFollowerPeer);
+    }
     else if (err.type === "browser-incompatible") setNetStatus("This browser can't connect phones. Use Safari.");
   });
 }
@@ -3344,12 +3711,15 @@ function connectToHost(){
   const conn = net.peer.connect(peerId(netCfg.joinCode), { reliable: true, metadata: { name: netCfg.name || "", dev: netCfg.dev } });
   net.hostConn = conn;
   const timer = setTimeout(() => { if (!conn.open) lost(); }, 15000);
+  conn.cl_lost = lost;
   function lost(){
     clearTimeout(timer);
     if (net.hostConn !== conn) return;
     net.hostConn = null;
     try { conn.close(); } catch {}
-    stopSending();
+    // hang up the camera call, but if this is the camera phone keep the camera and clip recording
+    // going: the main phone asks for the camera again when the link is back
+    stopSendCall();
     dropMain();
     if (cfg.source === "main") applySource();
     setNetStatus("Lost the main phone. Reconnecting…");
@@ -3357,11 +3727,18 @@ function connectToHost(){
   }
   conn.on("open", () => {
     clearTimeout(timer);
+    net.hostSeen = Date.now(); net.hostPinged = false;
     setNetStatus("Synced with the main phone");
     sendWatch();
     sendOffer();
+    // clips still waiting on this phone show up in the main phone's count
+    if (clip.pending.length){ try { conn.send({ t: "clipst", msg: "", n: clip.pending.length }); } catch {} }
   });
-  conn.on("data", onFollowerData);
+  conn.on("data", d => {
+    net.hostSeen = Date.now();
+    if (d && d.t === "ping"){ net.hostPinged = true; return; }
+    onFollowerData(d);
+  });
   conn.on("close", lost); conn.on("error", lost);
 }
 function onFollowerData(d){
@@ -3372,9 +3749,38 @@ function onFollowerData(d){
     if (d.state) applyHostState(d.state);
   } else if (d.t === "state") applyHostState(d);
   else if (d.t === "camreq"){
-    // the main phone picked (or stopped picking) this phone for camera and sound
+    // the main phone picked (or stopped picking) this phone for camera and sound. "again": its
+    // picture stopped coming through, so call again even if this side thinks the call is fine
     net.camWanted = !!d.on && !!netCfg.sendCam;
-    if (net.camWanted) startSendCam(); else stopSending();
+    if (!net.camWanted) stopSending();
+    else if (d.again || !callUp(net.camCall)) startSendCam();
+    clipSync();
+  } else if (d.t === "perms"){
+    net.perms = { clip: !!d.clip, prefabs: !!d.prefabs };
+    net.prefabNames = d.names && typeof d.names === "object" ? d.names : {};
+    document.body.classList.toggle("perm-prefabs", net.perms.prefabs);
+    renderBar(); renderClipBtn(); renderNet();
+  } else if (d.t === "pc"){
+    net.pcId = String(d.id || "");
+    if (net.pcLink && net.pcLink.peer !== net.pcId){ const l = net.pcLink; net.pcLink = null; try { l.close(); } catch {} }
+    if (net.pcId && clip.pending.length) pcLink();
+  } else if (d.t === "clipnow"){
+    // CLIP was tapped on the main phone (or a phone allowed to clip)
+    takeClip(false);
+  } else if (d.t === "feedpc"){
+    // the main phone wants this phone's camera to go straight to the PC (hq: the PC is recording)
+    if (!d.on){ if (!net.feedPc || net.feedPc.id === String(d.id || "")) stopPcFeed(); }
+    else {
+      const f = { id: String(d.id || ""), hq: !!d.hq };
+      const same = net.feedPc && net.feedPc.id === f.id;
+      net.feedPc = f;
+      if (same && net.pcCall && callUp(net.pcCall)) tuneSender(net.pcCall, f.hq);
+      else startPcFeed();
+    }
+  } else if (d.t === "clipst"){
+    net.clipWait = Math.max(0, +d.n || 0);
+    renderClipCount();
+    if (d.msg) toast(String(d.msg).slice(0, 120));
   }
   else showRemote(d);
 }
@@ -3388,38 +3794,63 @@ function applyHostState(s){
   Object.assign(cfg, { streamer: String(s.streamer || ""), title: String(s.title || ""), category: String(s.category || ""), tags: String(s.tags || "") });
   live = { on: !!s.on, startedAt: Date.now() - (+s.up || 0) };
   vs.now = +s.v || 0;
-  net.hostView = { on: !!s.on, mode: String(s.mode || "7"), ends: Date.now() + (+s.left || 0) };
+  net.hostView = { on: !!s.on, mode: String(s.mode || "7"), ends: Date.now() + (+s.left || 0), dur: +s.dur || 0 };
   renderHeader();
 }
 
 /* ---- sending this phone's camera to the main phone ---- */
 async function startSendCam(){
-  if (!isSending() || !net.peer || !net.hostConn || !net.hostConn.open) return;
+  if (!isSending() || !net.peer || !net.hostConn || !net.hostConn.open || net.camStarting) return;
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){ toast("This phone can't send its camera from here"); return; }
+  net.camStarting = true;
   try {
     const s = await getCam(cfg.source === "front" ? "user" : "environment");
     // this phone's microphone goes along so the main phone's clips and PC get its sound
     // (don't wait forever if the microphone question is still on screen)
+    const warned = clip.micWarned;
     clip.micWarned = true;
-    const mic = await Promise.race([getMic(), new Promise(r => setTimeout(() => r(null), 8000))]);
-    const a = mic && mic.getAudioTracks().find(t => t.readyState === "live");
-    if (!a) toast("Microphone is off, so the main phone gets this camera without sound");
-    if (!isSending() || !net.hostConn || !net.hostConn.open) return;
+    await Promise.race([getMic(), new Promise(r => setTimeout(() => r(null), 8000))]);
+    const a = soundTrack();
+    if (!a && !warned) toast("Microphone is off, so clips and the main phone get this camera without sound");
+    if (!isSending() || !net.peer || !net.peer.open || !net.hostConn || !net.hostConn.open) return;
     stopSendCall();
     const out = new MediaStream(a ? [s.getVideoTracks()[0], a] : [s.getVideoTracks()[0]]);
     const call = net.peer.call(peerId(netCfg.joinCode), out, { metadata: { role: "camera", name: netCfg.name || "" } });
+    if (!call) return;
     net.camCall = call;
+    tuneSender(call);
     call.on("close", () => { if (net.camCall === call) net.camCall = null; });
     setNetStatus("Synced · the main phone is using your camera and sound");
-    toast("The main phone is using your camera and sound");
+    // only once: calling again after a reconnect shouldn't pop up in what this phone records
+    if (!net.camAnnounced){ net.camAnnounced = true; toast("The main phone is using your camera and sound"); }
     if (cfg.layout !== "chat" && (cfg.source === "back" || cfg.source === "front")) applySource();
+    if (net.feedPc && !callUp(net.pcCall)) startPcFeed();
   } catch (err) {
     toast(err && err.name === "NotAllowedError" ? "Camera access is off for this app" : "Couldn't start your camera");
+  } finally {
+    net.camStarting = false;
   }
 }
 function stopSendCall(){
   if (net.camCall){ const c = net.camCall; net.camCall = null; try { c.close(); } catch {} }
 }
+/* ---- this phone's camera straight to the PC (while it's the camera and the PC wants it) ---- */
+function startPcFeed(){
+  const f = net.feedPc;
+  if (!f || !f.id || !isSending() || !camLive() || !net.peer || !net.peer.open) return;
+  stopPcFeedCall();
+  const a = soundTrack(), v = stream.getVideoTracks()[0];
+  const call = net.peer.call(f.id, new MediaStream(a ? [v, a] : [v]), { metadata: { role: "main", sound: !!a, direct: true } });
+  if (!call) return;
+  call.startedAt = Date.now();
+  net.pcCall = call;
+  tuneSender(call, f.hq);
+  call.on("close", () => { if (net.pcCall === call) net.pcCall = null; });
+}
+function stopPcFeedCall(){
+  if (net.pcCall){ const k = net.pcCall; net.pcCall = null; try { k.close(); } catch {} }
+}
+function stopPcFeed(){ net.feedPc = null; stopPcFeedCall(); }
 /* tell the main phone whether it may use this phone's camera and sound */
 function sendOffer(){
   if (!isFollower() || !net.hostConn || !net.hostConn.open) return;
@@ -3427,8 +3858,9 @@ function sendOffer(){
 }
 /* stop sending: hang up, and let go of the camera and microphone unless this phone shows its own camera */
 function stopSending(){
-  net.camWanted = false;
+  net.camWanted = false; net.camAnnounced = false;
   stopSendCall();
+  stopPcFeed();
   stopMic();
   applySource();
   if (isFollower() && net.hostConn && net.hostConn.open) setNetStatus("Synced with the main phone");
@@ -3443,20 +3875,33 @@ function dropMain(){
   if (net.main){ try { net.main.call.close(); } catch {} }
   net.main = null; $("mainCam").srcObject = null;
 }
+/* the camera flipped, or the leveled sound started: swap the picture and sound in the calls this
+   phone makes (to the main phone, and straight to the PC) */
 function updateSendTrack(){
-  const pc = net.camCall && net.camCall.peerConnection;
-  const t = stream && stream.getVideoTracks()[0];
-  if (!pc || !t) return;
-  pc.getSenders().forEach(s => { if (s.track && s.track.kind === "video") s.replaceTrack(t).catch(() => {}); });
+  const v = stream && stream.getVideoTracks()[0], a = soundTrack();
+  [net.camCall, net.pcCall].forEach(k => {
+    const pc = k && k.peerConnection;
+    if (!pc) return;
+    pc.getSenders().forEach(s => {
+      const kind = s.track ? s.track.kind : null;
+      if (kind === "video" && v && s.track !== v) s.replaceTrack(v).catch(() => {});
+      if (kind === "audio" && a && s.track !== a) s.replaceTrack(a).catch(() => {});
+    });
+  });
 }
 
 /* ---- leaving / waking up ---- */
 function leaveNet(keepMode){
-  clearTimeout(net.retryT); clearTimeout(net.joinT);
+  clearTimeout(net.retryT); clearTimeout(net.joinT); clearTimeout(net.healT);
   const wasFollower = isFollower(), wasHost = net.role === "host";
-  net.camWanted = false;
+  net.camWanted = false; net.camAnnounced = false;
   stopSendCall();
+  stopPcFeed();
   dropMain();
+  if (net.pcLink){ const l = net.pcLink; net.pcLink = null; try { l.close(); } catch {} }
+  net.pcId = ""; net.clipWait = 0; net.hostPinged = false;
+  net.perms = { clip: false, prefabs: false }; net.prefabNames = {};
+  document.body.classList.remove("perm-prefabs");
   if (net.remote){ try { net.remote.call.close(); } catch {} }
   net.remote = null; $("remoteCam").srcObject = null;
   for (const c of net.conns.values()){ try { c.conn.close(); } catch {} }
@@ -3479,6 +3924,7 @@ function leaveNet(keepMode){
     applySource();
     if (live.on){ scheduleChat(); scheduleEvents(); }
   } else if (wasHost && cfg.source === "remote") applySource();
+  renderBar(); clipSync();
   renderNet();
 }
 function netWake(){
@@ -3523,16 +3969,20 @@ function renderNet(){
     $("pcHow").append(" ", a);
   }
   $("jCam2").checked = !!netCfg.sendCam;
+  const pm = [net.perms.clip && "tap CLIP", net.perms.prefabs && "use the number buttons"].filter(Boolean);
+  $("permNote").textContent = r === "follower" ? (pm.length ? `The main phone lets this phone ${pm.join(" and ")}.` : "The main phone can let this phone tap CLIP or use the number buttons.") : "";
   $("netBadge").textContent = r === "host" ? `· Room ${netCfg.hostCode} · ${net.conns.size}`
     : r === "follower" ? (net.hostConn && net.hostConn.open ? "· Synced" : "· Reconnecting…") : "";
 }
-/* main phone: pick the phone the stream picture, clips and PC view come from */
+/* main phone: every phone in the room. Use picks the phone the stream picture, clips and PC view
+   come from; Clip and Prefabs let that phone tap CLIP or the number buttons. */
 function renderCamList(){
   const box = $("camList"); box.textContent = "";
   const phones = [...net.conns.values()].filter(c => c.dev);
   const usingThis = cfg.source !== "remote";
-  const row = (name, note, inUse, canUse, onUse) => {
-    const d = document.createElement("div"); d.className = "camrow" + (inUse ? " on" : "");
+  const row = (name, note, inUse, canUse, onUse, dev) => {
+    const item = document.createElement("div"); item.className = "camitem" + (inUse ? " on" : "");
+    const d = document.createElement("div"); d.className = "camrow";
     const t = document.createElement("div"); t.className = "camwho";
     const b = document.createElement("b"); b.textContent = name;
     const s = document.createElement("small"); s.textContent = note;
@@ -3541,7 +3991,19 @@ function renderCamList(){
     btn.type = "button"; btn.className = "btn" + (inUse ? " ghost" : "");
     btn.textContent = inUse ? "In use" : "Use"; btn.disabled = inUse || !canUse;
     btn.addEventListener("click", onUse);
-    d.append(t, btn); box.appendChild(d);
+    d.append(t, btn); item.appendChild(d);
+    if (dev){
+      const p = permFor(dev), perms = document.createElement("div"); perms.className = "perms";
+      [["clip", "Clip"], ["prefabs", "Prefabs"]].forEach(([key, label]) => {
+        const l = document.createElement("label"); l.className = "chip";
+        const i = document.createElement("input"); i.type = "checkbox"; i.checked = p[key];
+        i.addEventListener("change", () => setPerm(dev, key, i.checked));
+        const sp = document.createElement("span"); sp.textContent = label;
+        l.append(i, sp); perms.appendChild(l);
+      });
+      item.appendChild(perms);
+    }
+    box.appendChild(item);
   };
   row("This phone", usingThis ? "Stream picture, clips and PC use this phone" : "This phone's camera and microphone", usingThis, true, () => pickCamera(""));
   phones.forEach(c => {
@@ -3549,11 +4011,11 @@ function renderCamList(){
     const sound = net.remote && net.remote.stream.getAudioTracks().length;
     const note = !c.avail ? "Hasn't turned on Let the main phone use my camera and sound"
       : !inUse ? "Ready to use"
-      : net.remote ? (sound ? "Live: camera and sound" : "Live: camera (its microphone is off)")
+      : net.remote ? (sound ? "Live: camera and sound · records the clips" : "Live: camera (its microphone is off) · records the clips")
       : "Connecting…";
-    row(c.name, note, inUse, c.avail, () => pickCamera(c.dev));
+    row(c.name, note, inUse, c.avail, () => pickCamera(c.dev), c.dev);
   });
-  if (!usingThis && netCfg.pick && !pickedConn()) row(netCfg.pickName || "Picked phone", "Not connected. Pick another camera.", true, false, () => {});
+  if (!usingThis && netCfg.pick && !pickedConn()) row(netCfg.pickName || "Picked phone", "Not connected right now. It reconnects by itself, or pick another camera.", true, false, () => {});
   $("camListNote").hidden = phones.length > 0;
 }
 function openNet(){

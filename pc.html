@@ -8,7 +8,7 @@
 <title>Chatline Clip Folder</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:wght@400;500;600;700;800&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Figtree:ital,wght@0,400;0,500;0,600;0,700;0,800;1,600&family=Barlow+Condensed:wght@600;700&display=swap">
 <style>
 /* The PC side of Chatline clips: one screen. Type the phone's code, pick a folder, and every clip
    the phone takes is written into that folder. Dark only, to match the app. */
@@ -78,6 +78,14 @@ li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-num
 .cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:contain}
 .cammsg{position:relative;margin:0;padding:16px;text-align:center;color:var(--muted);font-size:14px}
 .unsupported{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:18px}
+.via{margin-left:8px;font-size:12px;font-weight:600;letter-spacing:0;text-transform:none;color:var(--muted)}
+#recCard{gap:12px}
+.rechead{display:flex;justify-content:space-between;align-items:center;gap:12px}
+.recbadge{font-weight:800;font-size:12px;letter-spacing:.08em;color:#fff;background:var(--live);border-radius:4px;padding:3px 7px}
+.check{display:flex;gap:10px;align-items:center;font-weight:600;font-size:14px;cursor:pointer}
+.check input{width:18px;height:18px;margin:0;accent-color:var(--accent)}
+.status.rec .dot{background:var(--live);animation:pulse 1s ease-in-out infinite alternate}
+@media (prefers-reduced-motion:reduce){.status.rec .dot{animation:none}}
 </style>
 </head>
 <body>
@@ -116,7 +124,7 @@ li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-num
 
   <section class="camwrap" id="camWrap" hidden>
     <div class="camhead">
-      <h2>Phone camera</h2>
+      <h2>Phone camera<span class="via" id="camVia"></span></h2>
       <div class="camctl">
         <button type="button" class="btn ghost" id="soundToggle" aria-pressed="true"></button>
         <button type="button" class="btn ghost" id="camToggle">Hide</button>
@@ -129,16 +137,25 @@ li span:last-child{flex:none;color:var(--muted);font-variant-numeric:tabular-num
     <p class="note" id="camNote" hidden></p>
   </section>
 
+  <section class="card" id="recCard">
+    <div class="rechead"><h2>Whole stream recording</h2><span class="recbadge" id="recBadge" hidden>REC</span></div>
+    <label class="check"><input type="checkbox" id="recOn"> Record the whole stream</label>
+    <label class="check"><input type="checkbox" id="recChat"> Draw the chat on the video</label>
+    <div class="status" id="recStatus"><span class="dot"></span><span id="recText"></span></div>
+    <p class="note">While the stream is live, it records into a new folder inside your clip folder, in 10-minute parts (normal MP4s, about 750 MB each, 1080p). While this is on, your camera phone sends its full-quality picture, which uses about 3.6 GB of mobile data an hour.</p>
+  </section>
+
   <section style="display:grid;gap:10px">
     <h2>Saved this session</h2>
     <ul id="saved"></ul>
     <p class="empty" id="savedEmpty">Nothing yet. Tap CLIP on your phone.</p>
   </section>
 
-  <p class="note">Keep this tab open while you stream (minimized is fine). If your PC sleeps, clips wait on the phone and arrive when you come back.</p>
+  <p class="note">Keep this tab open while you stream (minimized is fine). If your PC sleeps, clips wait on the phone and arrive when you come back. The whole-stream recording only covers the time this tab is open and awake.</p>
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script src="mp4.js"></script>
 <script>
 (() => {
 "use strict";
@@ -158,13 +175,19 @@ function iceConfig(){
   ] };
 }
 
+const QUIET_MS = 15000;
 const st = {
   code: "", dir: null, ok: false,
-  peer: null, conn: null, retryT: null, noPhone: false, failed: "",
+  peer: null, conn: null, retryT: null, healT: null, noPhone: false, failed: "",
+  seen: 0, pinged: false, phones: new Set(),
   parts: new Map(), recv: null,
   watch: true, call: null, live: false,
-  sound: true, soundBlocked: false, micOff: false
+  sound: true, soundBlocked: false, micOff: false,
+  // from the main phone, for drawing on the recording: the last chat lines and the stream's info
+  chat: [], hs: null
 };
+/* the main phone passes the camera on itself; otherwise it comes straight from the camera phone */
+const viaMain = k => !!k && k.peer === peerId(st.code);
 try { st.code = normCode(localStorage.getItem("chatlinePC.code")); } catch {}
 try { st.watch = localStorage.getItem("chatlinePC.watch") !== "off"; } catch {}
 try { st.sound = localStorage.getItem("chatlinePC.sound") !== "off"; } catch {}
@@ -192,7 +215,7 @@ async function checkFolder(ask){
       ok = p === "granted";
     } catch {}
   }
-  st.ok = ok; st.failed = "";
+  st.ok = ok; st.failed = ""; rec.err = "";
   tell(); render();
   return ok;
 }
@@ -213,10 +236,25 @@ function connect(){
   if (!st.peer || st.peer.destroyed){
     const p = new Peer({ config: iceConfig(), debug: 0 });
     st.peer = p;
-    p.on("open", () => { if (st.peer === p) openConn(); });
+    p.on("open", () => {
+      if (st.peer !== p) return;
+      p.cl_opened = true; p.cl_heals = 0;
+      // back on the server after a drop: the link to the phone usually survived it
+      if (!linked()) openConn();
+    });
+    // a joined phone whose camera is the stream picture sends its clips straight here
+    p.on("connection", conn => {
+      if (!conn.metadata || conn.metadata.role !== "clips"){ try { conn.close(); } catch {} return; }
+      st.phones.add(conn);
+      conn.on("data", d => onData(d, conn));
+      const bye = () => { st.phones.delete(conn); };
+      conn.on("close", bye); conn.on("error", bye);
+    });
     // the phone's camera, sent while this page asks for it
     p.on("call", call => {
       if (!call.metadata || call.metadata.role !== "main"){ try { call.close(); } catch {} return; }
+      // a working picture straight from the camera phone beats one passed on by the main phone
+      if (st.call && st.live && !viaMain(st.call) && viaMain(call)){ try { call.close(); } catch {} return; }
       if (st.call && st.call !== call){ try { st.call.close(); } catch {} }
       st.call = call; st.live = false;
       st.micOff = !call.metadata.sound;
@@ -226,37 +264,56 @@ function connect(){
         $("phoneCam").srcObject = s;
         st.live = true;
         applySound();
+        recSource(s);
+        tell();
       });
       const end = () => { if (st.call === call) dropCall(); };
       call.on("close", end); call.on("error", end);
     });
-    p.on("disconnected", () => setTimeout(() => {
-      if (st.peer === p && !p.destroyed && p.disconnected){ try { p.reconnect(); } catch {} }
-    }, 2000));
+    p.on("disconnected", () => heal(p));
     p.on("error", err => {
       if (st.peer !== p) return;
       if (err.type === "peer-unavailable"){
         st.noPhone = true; dropConn();
         st.retryT = setTimeout(openConn, 5000);
-      } else if (NET_RETRY.includes(err.type)){
-        try { p.destroy(); } catch {}
-        st.peer = null; dropConn();
-        st.retryT = setTimeout(connect, 4000);
-      }
+      } else if (NET_RETRY.includes(err.type)) heal(p);
       render();
     });
   } else if (st.peer.open) openConn();
   render();
 }
-function dropConn(){
+/* The PeerJS server is only used to find the phone, and its connection drops now and then. The link
+   to the phone keeps working without it, so reconnect to the server with the same id instead of
+   starting over (which would cut the phone off). */
+function heal(p){
+  if (st.peer !== p || p.destroyed) return;
+  if (!p.cl_opened){
+    // never got onto the server: start over
+    try { p.destroy(); } catch {}
+    st.peer = null; dropConn();
+    clearTimeout(st.retryT); st.retryT = setTimeout(connect, 4000);
+    return;
+  }
+  clearTimeout(st.healT);
+  const wait = Math.min(15000, 1000 * 2 ** (p.cl_heals = (p.cl_heals || 0) + 1));
+  st.healT = setTimeout(() => {
+    if (st.peer === p && !p.destroyed && p.disconnected){ try { p.reconnect(); } catch {} }
+  }, wait);
+}
+/* lost the main phone: drop the picture it was passing on (a picture straight from the camera
+   phone keeps going, so the recording does too). all: also that one (a new room code) */
+function dropConn(all){
   const c = st.conn; st.conn = null;
   if (c){ try { c.close(); } catch {} }
-  dropCall();
+  if (all || viaMain(st.call)) dropCall();
 }
 function dropCall(){
-  const k = st.call; st.call = null; st.live = false;
+  const k = st.call, was = st.live;
+  st.call = null; st.live = false;
   $("phoneCam").srcObject = null;
   if (k){ try { k.close(); } catch {} }
+  recSource(null);
+  if (was) tell();
   render();
 }
 function openConn(){
@@ -265,32 +322,62 @@ function openConn(){
   dropConn();
   const c = st.peer.connect(peerId(st.code), { reliable: true, metadata: { name: "pc" } });
   st.conn = c;
+  st.pinged = false;
   const timer = setTimeout(() => { if (!c.open) lost(); }, 15000);
+  c.cl_lost = lost;
   function lost(){
     clearTimeout(timer);
     if (st.conn !== c) return;
     st.conn = null;
     try { c.close(); } catch {}
-    dropCall();
+    if (viaMain(st.call)) dropCall();
     st.recv = null;
     st.retryT = setTimeout(openConn, 4000);
     render();
   }
-  c.on("open", () => { clearTimeout(timer); st.noPhone = false; tell(); render(); });
-  c.on("data", onData);
+  c.on("open", () => { clearTimeout(timer); st.noPhone = false; st.seen = Date.now(); tell(); render(); });
+  c.on("data", d => {
+    st.seen = Date.now();
+    if (d && d.t === "ping"){ st.pinged = true; return; }
+    if (onHostMsg(d)) return;
+    onData(d, c);
+  });
   c.on("close", lost); c.on("error", lost);
   render();
 }
 const linked = () => !!(st.conn && st.conn.open);
 /* tell the phone whether clips can be saved here (it sends waiting clips as soon as this is on)
-   and whether to send its camera: while this page is on screen, or in the background too when
-   the sound is on (so you can keep listening) */
-const wantCam = () => st.watch && (!document.hidden || st.sound);
+   and whether to send its camera: always while recording the whole stream, otherwise while this
+   page is on screen, or in the background too when the sound is on (so you can keep listening).
+   rec asks for the full-quality feed; live says whether a picture is coming through. */
+const wantCam = () => recWanted() || (st.watch && (!document.hidden || st.sound));
 function tell(){
   if (!linked()) return;
   try { st.conn.send({ t: "clipdir", on: st.ok }); } catch {}
-  try { st.conn.send({ t: "watch", on: wantCam(), sound: true }); } catch {}
+  try { st.conn.send({ t: "watch", on: wantCam(), sound: true, rec: recWanted(), live: st.live }); } catch {}
   if (!wantCam()) dropCall();
+}
+
+/* ---- what the main phone shows: chat lines and the stream's info (for the recording) ---- */
+function onHostMsg(d){
+  if (!d || typeof d !== "object") return false;
+  if (d.t === "hello"){
+    st.chat = (Array.isArray(d.hist) ? d.hist : []).slice(-40);
+    if (d.state) hostInfo(d.state);
+  } else if (d.t === "state") hostInfo(d);
+  else if (d.t === "chat" || d.t === "ev" || d.t === "sys"){
+    st.chat.push(d);
+    if (st.chat.length > 40) st.chat.shift();
+  } else return false;
+  return true;
+}
+function hostInfo(s){
+  const wasOn = st.hs ? st.hs.on : null;
+  st.hs = { streamer: String(s.streamer || "").slice(0, 25), title: String(s.title || "").slice(0, 140),
+    category: String(s.category || "").slice(0, 40), on: !!s.on, up: +s.up || 0, v: +s.v || 0, at: Date.now() };
+  // the stream ended: finish the recording (the next stream gets a new folder)
+  if (wasOn && !st.hs.on) recEnd();
+  recSync();
 }
 
 /* ---- sound: browsers only play sound after you've clicked on the page, so it may start muted ---- */
@@ -313,179 +400,8 @@ function unblockSound(e){
 document.addEventListener("pointerdown", unblockSound);
 document.addEventListener("keydown", unblockSound);
 
-/* ---- making iPhone clips seekable ----
-   Safari records "fragmented" MP4: a header with empty sample tables, then one-second pieces
-   (moof + mdat), and no total length. Windows Media Player can't seek those. fixMp4 reads every
-   piece's sample list and writes one normal MP4: ftyp, a moov with full sample tables and the real
-   length, then all the media in one mdat. Returns null if the file isn't fragmented. */
-function fixMp4(buf){
-  const dv = new DataView(buf), u8 = new Uint8Array(buf);
-  const str = (o, n) => String.fromCharCode(...u8.subarray(o, o + n));
-  function list(s, e){
-    const out = [];
-    for (let o = s; o + 8 <= e; ){
-      let size = dv.getUint32(o), hdr = 8;
-      if (size === 1){ size = Number(dv.getBigUint64(o + 8)); hdr = 16; } else if (size === 0) size = e - o;
-      if (size < hdr || o + size > e) throw new Error("bad box at " + o);
-      out.push({ t: str(o + 4, 4), s: o, e: o + size, d: o + hdr });
-      o += size;
-    }
-    return out;
-  }
-  const kids = b => list(b.d, b.e);
-  const one = (b, t) => kids(b).find(x => x.t === t);
-  const raw = b => u8.slice(b.s, b.e);
-  const top = list(0, buf.byteLength);
-  const ftyp = top.find(b => b.t === "ftyp"), moov = top.find(b => b.t === "moov");
-  const moofs = top.filter(b => b.t === "moof");
-  if (!ftyp || !moov || !moofs.length) return null;
-
-  const mvhd = one(moov, "mvhd"), movieTs = dv.getUint32(mvhd.d + (u8[mvhd.d] ? 20 : 12));
-  const trex = new Map();
-  const mvex = one(moov, "mvex");
-  if (mvex) for (const x of kids(mvex).filter(b => b.t === "trex")){
-    trex.set(dv.getUint32(x.d + 4), { dur: dv.getUint32(x.d + 12), size: dv.getUint32(x.d + 16), flags: dv.getUint32(x.d + 20) });
-  }
-  const tracks = new Map();
-  for (const tk of kids(moov).filter(b => b.t === "trak")){
-    const tkhd = one(tk, "tkhd"), mdia = one(tk, "mdia"), mdhd = one(mdia, "mdhd"), hdlr = one(mdia, "hdlr");
-    const id = dv.getUint32(tkhd.d + (u8[tkhd.d] ? 20 : 12));
-    tracks.set(id, { id, trak: tk, tkhd, mdia, mdhd, ts: dv.getUint32(mdhd.d + (u8[mdhd.d] ? 20 : 12)),
-      vide: str(hdlr.d + 8, 4) === "vide", start: undefined, samples: [], chunks: [] });
-  }
-
-  // every sample, from every piece
-  let order = 0;
-  for (const moof of moofs){
-    let after = moof.s;
-    for (const traf of kids(moof).filter(b => b.t === "traf")){
-      const k = kids(traf), tfhd = k.find(b => b.t === "tfhd");
-      const ff = dv.getUint32(tfhd.d) & 0xffffff, T = tracks.get(dv.getUint32(tfhd.d + 4));
-      if (!T) continue;
-      const X = trex.get(T.id) || {};
-      let p = tfhd.d + 8, base, dDur = X.dur || 0, dSize = X.size || 0, dFlags = X.flags || 0;
-      if (ff & 1){ base = Number(dv.getBigUint64(p)); p += 8; } else base = (ff & 0x20000) ? moof.s : after;
-      if (ff & 2) p += 4;
-      if (ff & 8){ dDur = dv.getUint32(p); p += 4; }
-      if (ff & 0x10){ dSize = dv.getUint32(p); p += 4; }
-      if (ff & 0x20){ dFlags = dv.getUint32(p); p += 4; }
-      const tfdt = k.find(b => b.t === "tfdt");
-      if (tfdt && T.start === undefined) T.start = u8[tfdt.d] ? Number(dv.getBigUint64(tfdt.d + 4)) : dv.getUint32(tfdt.d + 4);
-      let pos = base;
-      for (const tr of k.filter(b => b.t === "trun")){
-        const rf = dv.getUint32(tr.d) & 0xffffff, v1 = u8[tr.d] === 1, n = dv.getUint32(tr.d + 4);
-        let q = tr.d + 8, first = null;
-        if (rf & 1){ pos = base + dv.getInt32(q); q += 4; }
-        if (rf & 4){ first = dv.getUint32(q); q += 4; }
-        let bytes = 0;
-        for (let i = 0; i < n; i++){
-          let dur = dDur, size = dSize, flags = dFlags, cto = 0;
-          if (rf & 0x100){ dur = dv.getUint32(q); q += 4; }
-          if (rf & 0x200){ size = dv.getUint32(q); q += 4; }
-          if (rf & 0x400){ flags = dv.getUint32(q); q += 4; }
-          if (rf & 0x800){ cto = v1 ? dv.getInt32(q) : dv.getUint32(q); q += 4; }
-          if (i === 0 && first !== null) flags = first;
-          T.samples.push({ dur, size, sync: !(flags & 0x10000), cto });
-          bytes += size;
-        }
-        if (pos + bytes > buf.byteLength) throw new Error("sample data runs past the end");
-        if (n) T.chunks.push({ src: pos, bytes, n, order: order++ });
-        pos += bytes;
-      }
-      after = pos;
-    }
-  }
-
-  // writing boxes
-  const cat = parts => { let n = 0; for (const p of parts) n += p.length; const o = new Uint8Array(n); let i = 0; for (const p of parts){ o.set(p, i); i += p.length; } return o; };
-  const u32s = arr => { const o = new Uint8Array(arr.length * 4), d = new DataView(o.buffer); arr.forEach((v, i) => d.setUint32(i * 4, v >>> 0)); return o; };
-  const box = (t, ...parts) => { const body = cat(parts), o = new Uint8Array(8 + body.length); new DataView(o.buffer).setUint32(0, o.length); for (let i = 0; i < 4; i++) o[4 + i] = t.charCodeAt(i); o.set(body, 8); return o; };
-  const full = (t, v, f, ...parts) => box(t, u32s([(v << 24) | f]), ...parts);
-  const patched = (b, at, v64, value) => { const o = raw(b), d = new DataView(o.buffer), off = (b.d - b.s) + at; if (v64) d.setBigUint64(off, BigInt(value)); else d.setUint32(off, value >>> 0); return o; };
-  const rle = vals => { const out = []; for (const v of vals){ if (out.length && out[out.length - 1][1] === v) out[out.length - 1][0]++; else out.push([1, v]); } return out; };
-  const toMovie = (v, ts) => Math.round(v * movieTs / ts);
-
-  const all = [...tracks.values()].filter(T => T.samples.length);
-  const chunks = all.flatMap(T => T.chunks).sort((a, b) => a.order - b.order);
-  const mediaBytes = chunks.reduce((n, c) => n + c.bytes, 0);
-  let movieDur = 0;
-  for (const T of all){
-    T.dur = T.samples.reduce((n, s) => n + s.dur, 0);
-    T.startM = toMovie(T.start || 0, T.ts);
-    T.durM = toMovie(T.dur, T.ts);
-    movieDur = Math.max(movieDur, T.startM + T.durM);
-  }
-
-  function stbl(T, stsd){
-    const S = T.samples, parts = [raw(stsd)];
-    parts.push(full("stts", 0, 0, u32s([...(r => [r.length, ...r.flat()])(rle(S.map(s => s.dur)))])));
-    if (S.some(s => s.cto)){
-      const neg = S.some(s => s.cto < 0), r = rle(S.map(s => s.cto));
-      parts.push(full("ctts", neg ? 1 : 0, 0, u32s([r.length, ...r.flat()])));
-    }
-    if (T.vide && S.some(s => !s.sync)){
-      const idx = []; S.forEach((s, i) => { if (s.sync) idx.push(i + 1); });
-      parts.push(full("stss", 0, 0, u32s([idx.length, ...idx])));
-    }
-    const sc = []; T.chunks.forEach((c, i) => { if (!sc.length || sc[sc.length - 1][1] !== c.n) sc.push([i + 1, c.n, 1]); });
-    parts.push(full("stsc", 0, 0, u32s([sc.length, ...sc.flat()])));
-    parts.push(full("stsz", 0, 0, u32s([0, S.length, ...S.map(s => s.size)])));
-    parts.push(full("stco", 0, 0, u32s([T.chunks.length, ...T.chunks.map(c => c.out)])));
-    return box("stbl", ...parts);
-  }
-  function trak(T){
-    const parts = [];
-    for (const b of kids(T.trak)){
-      if (b.t === "tkhd"){
-        parts.push(patched(b, u8[b.d] ? 28 : 20, !!u8[b.d], T.startM + T.durM));
-        const mt = T.samples[0].cto || 0;
-        if (T.startM || mt){
-          const e = []; if (T.startM) e.push(T.startM, -1, 0x00010000); e.push(T.durM, mt, 0x00010000);
-          parts.push(box("edts", full("elst", 0, 0, u32s([e.length / 3, ...e]))));
-        }
-      } else if (b.t === "mdia"){
-        const m = [];
-        for (const c of kids(b)){
-          if (c.t === "mdhd") m.push(patched(c, u8[c.d] ? 24 : 16, !!u8[c.d], T.dur));
-          else if (c.t === "minf"){
-            const f = [];
-            for (const g of kids(c)) f.push(g.t === "stbl" ? stbl(T, one(g, "stsd")) : raw(g));
-            m.push(box("minf", ...f));
-          } else m.push(raw(c));
-        }
-        parts.push(box("mdia", ...m));
-      } else if (b.t !== "edts") parts.push(raw(b));
-    }
-    return box("trak", ...parts);
-  }
-  function buildMoov(){
-    const parts = [];
-    for (const b of kids(moov)){
-      if (b.t === "mvhd") parts.push(patched(b, u8[b.d] ? 24 : 16, !!u8[b.d], movieDur));
-      else if (b.t === "trak"){ const T = all.find(x => x.trak.s === b.s); if (T) parts.push(trak(T)); }
-      else if (b.t !== "mvex") parts.push(raw(b));
-    }
-    return box("moov", ...parts);
-  }
-  // lay out the media, then write the header with where each piece now sits
-  const ft = raw(ftyp);
-  chunks.forEach(c => { c.out = 0; });
-  const moovSize = buildMoov().length;
-  let at = ft.length + moovSize + 8;
-  for (const c of chunks){ c.out = at; at += c.bytes; }
-  if (at > 0xffffffff) throw new Error("too big");
-  const out = new Uint8Array(at);
-  out.set(ft, 0);
-  const mv = buildMoov(); out.set(mv, ft.length);
-  const mdatAt = ft.length + mv.length;
-  new DataView(out.buffer).setUint32(mdatAt, 8 + mediaBytes);
-  out.set([109, 100, 97, 116], mdatAt + 4); // "mdat"
-  for (const c of chunks) out.set(u8.subarray(c.src, c.src + c.bytes), c.out);
-  return out;
-}
-
 /* ---- receiving and saving clips ---- */
-function onData(d){
+function onData(d, from){
   if (!d || typeof d !== "object" || d.t !== "clippart") return; // chat and the rest are for phones
   const id = String(d.id || "");
   const data = d.data;
@@ -498,18 +414,21 @@ function onData(d){
   if (e.got < e.n) return;
   st.parts.delete(id);
   const name = String(d.name || "chatline-clip.mp4").replace(/[\\/:*?"<>|]/g, "_");
-  save(id, name, new Blob(e.parts, { type: String(d.type || "video/mp4") }));
+  save(id, name, new Blob(e.parts, { type: String(d.type || "video/mp4") }), from);
 }
-async function save(id, name, blob){
-  // iPhone clips arrive streaming-style: make them normal MP4s so players show the length and can seek
-  if (/mp4/.test(blob.type)){
-    try { const fixed = fixMp4(await blob.arrayBuffer()); if (fixed) blob = new Blob([fixed], { type: "video/mp4" }); } catch {}
+async function save(id, name, blob, from){
+  // clips from an older app arrive streaming-style: make them normal MP4s so players show the
+  // length and can seek (the app now does this itself before sending)
+  if (/mp4/.test(blob.type) && window.chatlineMp4){
+    try { const fixed = chatlineMp4.fixMp4(await blob.arrayBuffer()); if (fixed) blob = new Blob([fixed.data], { type: "video/mp4" }); } catch {}
   }
   try {
     const fh = await st.dir.getFileHandle(name, { create: true });
     const w = await fh.createWritable();
     await w.write(blob); await w.close();
-    if (linked()){ try { st.conn.send({ t: "clipsaved", id }); } catch {} }
+    // tell whoever sent it (the main phone, or the camera phone directly) so it can forget the clip
+    const to = from && from.open ? from : linked() ? st.conn : null;
+    if (to){ try { to.send({ t: "clipsaved", id }); } catch {} }
     st.recv = null; st.failed = "";
     addSaved(name, blob.size);
   } catch {
@@ -529,6 +448,461 @@ function addSaved(name, size){
   $("saved").prepend(li);
 }
 
+/* ================= whole-stream recording ================= */
+/* While the stream is live, the camera feed and its sound are recorded into a new folder inside the
+   clip folder ("chatline-stream-<date>-<time>"), in 10-minute parts so a crash only loses the part
+   being recorded. Every frame is redrawn at 1080p, with the chat and stream info on top if that's
+   on, and recorded at 10 Mbps so this side adds as little blur as it can (the camera phone sends
+   its full 1080p picture while this is on). Frames are taken as they arrive, not on a screen timer,
+   so it keeps recording while this tab is minimized. If the picture drops, the video shows
+   "Reconnecting…" instead of stopping; after 3 minutes without a picture the part is closed and the
+   next picture starts a new part. Finished parts are made into normal MP4s (seekable, with their
+   length) in a background worker, so nothing stutters. */
+const REC_PART_MS = 10 * 60 * 1000, REC_GAP_MS = 3 * 60 * 1000;
+const REC_V_BPS = 10000000, REC_A_BPS = 192000;
+const REC_TYPES = ["video/mp4;codecs=avc1.640028,mp4a.40.2", "video/mp4;codecs=avc1,mp4a.40.2", "video/mp4;codecs=avc1,opus", "video/mp4", "video/webm;codecs=vp9,opus", "video/webm"];
+const recSupported = !!(window.MediaRecorder && window.MediaStreamTrackProcessor && window.MediaStreamTrackGenerator && window.VideoFrame);
+const rec = {
+  on: true, chat: true,
+  stream: null, reader: null,               // the incoming feed, and the frame reader on it
+  ac: null, adst: null, asrc: null,         // sound: whatever feed is coming in -> one steady track
+  canvas: null, ctx: null, gen: null, gw: null, out: null, pending: 0,
+  shape: "", lastShape: "tall", wantShape: "", wantSince: 0,
+  lastFrame: -1e9, lastOut: 0, // (no frame yet: the page's clock starts at 0, so 0 would look recent)
+  session: null, cur: null, starting: false, rotating: false, resizing: false,
+  err: "", fixQ: Promise.resolve(), fixing: 0, worker: null
+};
+try { rec.on = localStorage.getItem("chatlinePC.rec") !== "off"; } catch {}
+try { rec.chat = localStorage.getItem("chatlinePC.recChat") !== "off"; } catch {}
+function recWanted(){ return recSupported && rec.on && !!st.dir && st.ok; }
+const pad2 = n => String(n).padStart(2, "0");
+const stamp = t => `${t.getFullYear()}${pad2(t.getMonth() + 1)}${pad2(t.getDate())}-${pad2(t.getHours())}${pad2(t.getMinutes())}`;
+
+/* ---- sound: browsers only let a page record sound after a click on it ---- */
+function recAudio(){
+  if (!recSupported) return;
+  if (!rec.ac){
+    try { rec.ac = new AudioContext({ sampleRate: 48000 }); } catch { return; }
+    rec.adst = rec.ac.createMediaStreamDestination();
+    rec.ac.onstatechange = () => { recSync(); renderRec(); };
+    recHookAudio();
+  }
+  if (rec.ac.state === "suspended") rec.ac.resume().catch(() => {});
+}
+function recHookAudio(){
+  if (rec.asrc){ try { rec.asrc.disconnect(); } catch {} rec.asrc = null; }
+  const at = rec.stream && rec.stream.getAudioTracks()[0];
+  if (!at || !rec.ac) return;
+  try { rec.asrc = rec.ac.createMediaStreamSource(new MediaStream([at])); rec.asrc.connect(rec.adst); } catch {}
+}
+document.addEventListener("pointerdown", recAudio);
+document.addEventListener("keydown", recAudio);
+
+/* ---- picture ---- */
+/* the feed changed (a new call, or none) */
+function recSource(s){
+  rec.stream = s || null;
+  recStopReader();
+  recHookAudio();
+  recSync();
+}
+function recStopReader(){
+  if (rec.reader){ const r = rec.reader; rec.reader = null; r.cancel().catch(() => {}); }
+}
+function recStartReader(){
+  const vt = rec.stream && rec.stream.getVideoTracks()[0];
+  if (!vt) return;
+  let reader;
+  try { reader = new MediaStreamTrackProcessor({ track: vt }).readable.getReader(); } catch { return; }
+  rec.reader = reader;
+  (async () => {
+    for (;;){
+      let r;
+      try { r = await reader.read(); } catch { break; }
+      if (r.done) break;
+      if (rec.reader !== reader){ r.value.close(); break; }
+      recFrame(r.value);
+    }
+  })();
+}
+function recFrame(frame){
+  try {
+    const now = performance.now();
+    rec.lastFrame = now;
+    rec.lastShape = frame.displayWidth >= frame.displayHeight ? "wide" : "tall";
+    if (!rec.cur || rec.resizing) return;
+    // the phone turned: once it's stayed turned for 2s, start a new part in the new shape
+    if (rec.lastShape !== rec.shape){
+      if (rec.wantShape !== rec.lastShape){ rec.wantShape = rec.lastShape; rec.wantSince = now; }
+      else if (now - rec.wantSince > 2000){ recRotate(true); return; }
+    } else rec.wantShape = "";
+    if (Date.now() - rec.cur.start >= REC_PART_MS) recRotate(false);
+    if (now - rec.lastOut < 30) return; // at most about 30 frames a second
+    recDraw(frame);
+  } finally {
+    frame.close();
+  }
+}
+function recDraw(frame){
+  const x = rec.ctx, W = rec.canvas.width, H = rec.canvas.height;
+  if (frame){
+    const sw = frame.displayWidth, sh = frame.displayHeight, k = Math.max(W / sw, H / sh);
+    x.drawImage(frame, (W - sw * k) / 2, (H - sh * k) / 2, sw * k, sh * k);
+  } else {
+    const u = Math.min(W, H) / 1080;
+    x.fillStyle = "#120f1c"; x.fillRect(0, 0, W, H);
+    x.fillStyle = "rgba(255,255,255,.75)"; x.font = `600 ${44 * u}px Figtree, sans-serif`;
+    x.textAlign = "center"; x.fillText("Reconnecting…", W / 2, H / 2); x.textAlign = "left";
+  }
+  if (rec.chat) drawOverlay(x, W, H);
+  rec.lastOut = performance.now();
+  if (rec.pending > 2) return; // the recorder is behind: skip this frame
+  let vf;
+  try { vf = new VideoFrame(rec.canvas, { timestamp: Math.round(rec.lastOut * 1000) }); } catch { return; }
+  rec.pending++;
+  rec.gw.write(vf).catch(() => { try { vf.close(); } catch {} }).finally(() => { rec.pending--; });
+}
+function recSetup(shape){
+  if (!rec.canvas){
+    rec.canvas = document.createElement("canvas");
+    rec.ctx = rec.canvas.getContext("2d", { alpha: false });
+    rec.gen = new MediaStreamTrackGenerator({ kind: "video" });
+    rec.gw = rec.gen.writable.getWriter();
+    rec.out = new MediaStream([rec.gen, rec.adst.stream.getAudioTracks()[0]]);
+  }
+  rec.shape = shape;
+  rec.canvas.width = shape === "wide" ? 1920 : 1080;
+  rec.canvas.height = shape === "wide" ? 1080 : 1920;
+}
+
+/* ---- parts ---- */
+function recSync(){
+  const want = recWanted();
+  if (want && rec.stream && !rec.reader) recStartReader();
+  if (!want) recStopReader();
+  if (rec.starting || rec.rotating) return;
+  const now = performance.now();
+  const go = want && !rec.err && rec.ac && rec.ac.state === "running" && !(st.hs && !st.hs.on);
+  if (!rec.cur && go && rec.stream && now - rec.lastFrame < 2000) recStart();
+  else if (rec.cur && (!go || now - rec.lastFrame > REC_GAP_MS)) recStop();
+  if (!want && !rec.cur) rec.session = null; // turned off: the next recording gets a new folder
+}
+async function recStart(){
+  rec.starting = true;
+  try {
+    if (!rec.session){
+      const name = "chatline-stream-" + stamp(new Date());
+      rec.session = { name, dir: await st.dir.getDirectoryHandle(name, { create: true }), part: 0, started: Date.now(), bytes: 0 };
+    }
+    recSetup(rec.lastShape);
+    rec.cur = await recPart();
+  } catch {
+    recFail("Couldn't start recording into your folder. Click Change and pick it again.");
+  } finally {
+    rec.starting = false;
+    renderRec();
+  }
+}
+async function recPart(){
+  const s = rec.session;
+  s.part++;
+  const mime = REC_TYPES.find(t => MediaRecorder.isTypeSupported(t)) || "";
+  const ext = /mp4/.test(mime) ? "mp4" : "webm";
+  const name = `${s.name}-part${pad2(s.part)}.${ext}`;
+  const fh = await s.dir.getFileHandle(name, { create: true });
+  const w = await fh.createWritable();
+  const opts = { videoBitsPerSecond: REC_V_BPS, audioBitsPerSecond: REC_A_BPS };
+  if (mime) opts.mimeType = mime;
+  const mr = new MediaRecorder(rec.out, opts);
+  const part = { name, fh, mr, ext, bytes: 0, start: Date.now(), chain: Promise.resolve(), bad: false };
+  mr.ondataavailable = e => {
+    if (!e.data || !e.data.size) return;
+    part.bytes += e.data.size; s.bytes += e.data.size;
+    // written to disk as it goes, so a long recording never piles up in memory
+    part.chain = part.chain.then(() => w.write(e.data)).catch(() => {
+      if (!part.bad){ part.bad = true; recFail("Couldn't write the recording into your folder. Is the disk full?"); }
+    });
+  };
+  mr.onstop = () => { part.chain = part.chain.then(() => w.close()).then(() => recDone(part)).catch(() => {}); };
+  mr.onerror = () => recFail("The recording stopped unexpectedly. Turn it off and on to start again.");
+  mr.start(2000);
+  return part;
+}
+async function recRotate(resize){
+  if (rec.rotating || !rec.cur) return;
+  rec.rotating = true;
+  const old = rec.cur;
+  try {
+    if (resize){
+      // stop first: a part never changes size
+      rec.resizing = true; rec.cur = null;
+      try { old.mr.stop(); } catch {}
+      recSetup(rec.wantShape || rec.lastShape); rec.wantShape = "";
+      rec.cur = await recPart();
+    } else {
+      // start the next part first so nothing is lost in between
+      rec.cur = await recPart();
+      try { old.mr.stop(); } catch {}
+    }
+  } catch {
+    recFail("Couldn't start the next part of the recording.");
+  } finally {
+    rec.rotating = false; rec.resizing = false;
+  }
+}
+function recStop(){
+  const old = rec.cur; rec.cur = null;
+  if (old){ try { old.mr.stop(); } catch {} }
+}
+function recEnd(){ recStop(); rec.session = null; }
+function recFail(msg){ rec.err = msg; recStop(); renderRec(); }
+function recDone(part){
+  addSaved(part.name, part.bytes);
+  if (part.ext === "mp4") recFix(part);
+}
+/* make a finished part a normal MP4 in a background worker, one part at a time (a 10-minute part
+   is about 750 MB, so this keeps memory and the page calm) */
+function recFixer(){
+  if (!rec.worker){
+    const src = `importScripts(${JSON.stringify(new URL("mp4.js", location.href).href)});
+onmessage = async e => {
+  try {
+    const out = self.chatlineMp4.fixMp4(await e.data.arrayBuffer());
+    if (out) postMessage({ ok: true, data: out.data }, [out.data.buffer]);
+    else postMessage({ ok: true, data: null });
+  } catch (err) { postMessage({ ok: false }); }
+};`;
+    rec.worker = new Worker(URL.createObjectURL(new Blob([src], { type: "text/javascript" })));
+  }
+  return rec.worker;
+}
+function recFix(part){
+  rec.fixing++; renderRec();
+  rec.fixQ = rec.fixQ.then(async () => {
+    const file = await part.fh.getFile();
+    const w = recFixer();
+    const r = await new Promise(res => {
+      const t = setTimeout(() => res({ ok: false }), 180000);
+      w.onmessage = e => { clearTimeout(t); res(e.data); };
+      w.onerror = () => { clearTimeout(t); res({ ok: false }); };
+      w.postMessage(file);
+    });
+    if (r.ok && r.data){ const out = await part.fh.createWritable(); await out.write(r.data); await out.close(); }
+  }).catch(() => {}).finally(() => { rec.fixing--; renderRec(); });
+}
+// check on the recording (and fill in "Reconnecting…" frames while the picture is gone)
+setInterval(() => {
+  const now = performance.now();
+  if (rec.cur && !rec.resizing && now - rec.lastFrame > 1000 && now - rec.lastOut > 180) recDraw(null);
+  if (rec.cur && !rec.rotating && Date.now() - rec.cur.start >= REC_PART_MS) recRotate(false);
+  recSync();
+  renderRec();
+}, 200);
+
+/* ---- drawing the chat and stream info on the recording (like the app's full-screen layout) ---- */
+const COLORS = ["#ff7a8a","#ffb057","#ffd84d","#7be38a","#4fd1c5","#5fb4ff","#8f9bff","#c792ff","#ff8ad8","#ff7b54","#2ee6a8","#b5e655","#ff9f43","#54c7ff"];
+const nameHash = s => { let h = 2166136261; for (const c of s) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+const BADGES = {
+  broadcaster: ["#e8273b", new Path2D("M4 5h5a1 1 0 0 1 1 1v4a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1zM10.5 7.2 13 5.8v4.4l-2.5-1.4z")],
+  mod: ["#0aa84f", new Path2D("M11.5 3 13 4.5 7 10.5 5.5 9zM4 9.5 6.5 12 5.5 13 3 10.5z")],
+  vip: ["#e005b9", new Path2D("M8 3.5 12.5 7 8 12.5 3.5 7z")],
+  sub: ["#a873ff", new Path2D("m8 3 1.5 3.2 3.5.4-2.6 2.4.7 3.5L8 10.8l-3.1 1.7.7-3.5L3 6.6l3.5-.4z")]
+};
+// the same badges and name colors the app gives each chatter
+function badgesOf(m){
+  if (m.s) return ["broadcaster"];
+  const h = nameHash(String(m.n)) % 20;
+  return h === 0 ? ["mod", "sub"] : h === 1 ? ["vip"] : h < 9 ? ["sub"] : [];
+}
+const fmtN = n => Math.max(0, Math.round(n)).toLocaleString("en-US");
+function upClock(ms){ const s = Math.max(0, Math.floor(ms / 1000)); return `${Math.floor(s / 3600)}:${pad2(Math.floor(s / 60) % 60)}:${pad2(s % 60)}`; }
+function fitText(x, s, maxW){
+  if (x.measureText(s).width <= maxW) return s;
+  while (s.length > 1 && x.measureText(s + "…").width > maxW) s = s.slice(0, -1);
+  return s + "…";
+}
+/* word-wrap runs of text (and badges) into lines no wider than maxW */
+function flow(x, runs, maxW, u){
+  const lines = [[]], badgeW = 38 * u, gap = 8 * u;
+  let cx = 0;
+  const put = (item, w) => {
+    if (cx > 0 && cx + w > maxW){ lines.push([]); cx = 0; }
+    item.x = cx; lines[lines.length - 1].push(item); cx += w;
+  };
+  for (const r of runs){
+    if (r.badge){ put({ badge: r.badge }, badgeW + gap); continue; }
+    x.font = r.font;
+    const sp = x.measureText(" ").width;
+    for (const wd of r.str.split(/(\s+)/)){
+      if (!wd) continue;
+      if (/^\s+$/.test(wd)){ if (cx > 0) cx += sp; continue; }
+      const w = x.measureText(wd).width;
+      if (w <= maxW){ put({ str: wd, font: r.font, color: r.color }, w); continue; }
+      let part = ""; // one very long word (WWWWWWWW…): break it up
+      for (const ch of wd){
+        if (part && x.measureText(part + ch).width > maxW){ put({ str: part, font: r.font, color: r.color }, x.measureText(part).width); part = ch; }
+        else part += ch;
+      }
+      if (part) put({ str: part, font: r.font, color: r.color }, x.measureText(part).width);
+    }
+  }
+  return lines;
+}
+// sizes for a 1080-wide picture (about the app's own full-screen chat size)
+const FONT = u => ({
+  name: `700 ${40 * u}px Figtree, sans-serif`, text: `600 ${40 * u}px Figtree, sans-serif`,
+  sys: `italic 600 ${35 * u}px Figtree, sans-serif`, lead: `700 ${37 * u}px Figtree, sans-serif`, sub: `500 ${32 * u}px Figtree, sans-serif`
+});
+/* each chat line's layout, worked out once per size */
+function layMsg(x, m, maxW, u){
+  const key = maxW + "|" + u;
+  if (m._lay && m._lay.key === key) return m._lay;
+  const F = FONT(u);
+  let L;
+  if (m.t === "ev"){
+    const inner = maxW - 46 * u;
+    const lead = flow(x, [{ str: String(m.l || ""), font: F.lead, color: "#fff" }], inner, u);
+    const sub = m.u ? flow(x, [{ str: String(m.u), font: F.sub, color: "#cfc9dc" }], inner, u) : [];
+    L = { key, lead, sub, h: 32 * u + lead.length * 48 * u + sub.length * 44 * u };
+  } else if (m.t === "sys"){
+    const lines = flow(x, [{ str: String(m.x || ""), font: F.sys, color: "#dddddd" }], maxW, u);
+    L = { key, lines, h: lines.length * 50 * u };
+  } else {
+    const name = String(m.n || "");
+    const runs = badgesOf(m).map(b => ({ badge: b }));
+    runs.push({ str: name, font: F.name, color: m.s ? "#c49bff" : COLORS[nameHash(name) % COLORS.length] });
+    runs.push({ str: ": " + String(m.x || ""), font: F.text, color: "#fff" });
+    const lines = flow(x, runs, maxW, u);
+    L = { key, lines, h: lines.length * 54 * u };
+  }
+  m._lay = L;
+  return L;
+}
+function drawBadge(x, name, bx, by, size){
+  const [bg, path] = BADGES[name];
+  x.save();
+  x.shadowColor = "transparent";
+  x.translate(bx, by); x.scale(size / 16, size / 16);
+  x.fillStyle = bg; x.beginPath(); x.roundRect(0, 0, 16, 16, 3); x.fill();
+  x.fillStyle = "#fff"; x.fill(path);
+  x.restore();
+}
+function drawLines(x, lines, left, top, lh, base, u){
+  lines.forEach((line, i) => {
+    const y = top + i * lh + base;
+    for (const it of line){
+      if (it.badge) drawBadge(x, it.badge, left + it.x, y - 32 * u, 38 * u);
+      else { x.font = it.font; x.fillStyle = it.color; x.fillText(it.str, left + it.x, y); }
+    }
+  });
+}
+function drawOverlay(x, W, H){
+  const u = Math.min(W, H) / 1080, tall = H > W, pad = 40 * u;
+  const hs = st.hs || { streamer: "", title: "", category: "", on: true, up: 0, v: 0, at: Date.now() };
+  x.save();
+  // top: a dark fade, then avatar, name + LIVE, title, category; viewers and uptime on the right
+  let g = x.createLinearGradient(0, 0, 0, 330 * u);
+  g.addColorStop(0, "rgba(0,0,0,.62)"); g.addColorStop(1, "rgba(0,0,0,0)");
+  x.fillStyle = g; x.fillRect(0, 0, W, 330 * u);
+  const av = 88 * u, cx = pad + av / 2, cy = pad + av / 2;
+  [[av / 2 + 7 * u, "#e8273b"], [av / 2 + 3 * u, "#000"], [av / 2, "#a873ff"]].forEach(([r, c]) => { x.beginPath(); x.arc(cx, cy, r, 0, Math.PI * 2); x.fillStyle = c; x.fill(); });
+  x.fillStyle = "#fff"; x.font = `800 ${38 * u}px Figtree, sans-serif`; x.textAlign = "center"; x.textBaseline = "middle";
+  x.fillText((hs.streamer[0] || "?").toUpperCase(), cx, cy + u);
+  x.textBaseline = "alphabetic";
+  x.shadowColor = "rgba(0,0,0,.85)"; x.shadowBlur = 6 * u; x.shadowOffsetY = 2 * u;
+  const right = W - pad, tx = pad + av + 28 * u;
+  x.textAlign = "right";
+  x.font = `700 ${42 * u}px "Barlow Condensed", sans-serif`; x.fillStyle = "#ff6a78";
+  const vt = fmtN(hs.v), vw = x.measureText(vt).width;
+  x.fillText(vt, right, pad + 38 * u);
+  x.beginPath(); x.arc(right - vw - 24 * u, pad + 12 * u, 9 * u, 0, Math.PI * 2); x.fill(); // viewer icon
+  x.beginPath(); x.ellipse(right - vw - 24 * u, pad + 36 * u, 16 * u, 10 * u, 0, Math.PI, 0); x.fill();
+  x.font = `600 ${34 * u}px "Barlow Condensed", sans-serif`; x.fillStyle = "#d6d2e3";
+  const ut = upClock(hs.up + (Date.now() - hs.at));
+  x.fillText(ut, right, pad + 84 * u);
+  const statsW = Math.max(vw + 48 * u, x.measureText(ut).width) + 30 * u;
+  x.textAlign = "left";
+  x.font = `700 ${38 * u}px Figtree, sans-serif`; x.fillStyle = "#fff";
+  const nm = fitText(x, hs.streamer, right - statsW - tx - 110 * u);
+  x.fillText(nm, tx, pad + 34 * u);
+  const px = tx + x.measureText(nm).width + 16 * u;
+  x.save(); x.shadowColor = "transparent";
+  x.fillStyle = "#e8273b"; x.beginPath(); x.roundRect(px, pad + 4 * u, 78 * u, 38 * u, 6 * u); x.fill();
+  x.fillStyle = "#fff"; x.font = `700 ${28 * u}px "Barlow Condensed", sans-serif`; x.fillText("LIVE", px + 14 * u, pad + 33 * u);
+  x.restore();
+  x.font = `500 ${30 * u}px Figtree, sans-serif`; x.fillStyle = "#fff";
+  x.fillText(fitText(x, hs.title, right - statsW - tx), tx, pad + 78 * u);
+  x.font = `600 ${28 * u}px Figtree, sans-serif`; x.fillStyle = "#c49bff";
+  x.fillText(fitText(x, hs.category, right - statsW - tx), tx, pad + 116 * u);
+
+  // chat: bottom of the picture when upright, a column on the left when sideways; newest at the bottom
+  const cw = tall ? W - 2 * pad : Math.min(780 * u, W * 0.42);
+  const bottom = H - (tall ? 80 : 44) * u, top = tall ? H * 0.5 : H * 0.3;
+  x.shadowColor = "transparent";
+  if (tall){
+    // upright: darken the bottom of the picture, fading in from above the chat
+    g = x.createLinearGradient(0, top - 100 * u, 0, H);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(.4, "rgba(0,0,0,.38)"); g.addColorStop(1, "rgba(0,0,0,.62)");
+    x.fillStyle = g; x.fillRect(0, top - 100 * u, W, H - top + 100 * u);
+  } else {
+    // sideways: darken the left side, fading out to the right of the chat
+    const gw = cw + 2 * pad + 260 * u;
+    g = x.createLinearGradient(0, 0, gw, 0);
+    g.addColorStop(0, "rgba(0,0,0,.55)"); g.addColorStop((cw + 2 * pad) / gw, "rgba(0,0,0,.32)"); g.addColorStop(1, "rgba(0,0,0,0)");
+    x.fillStyle = g; x.fillRect(0, 0, gw, H);
+  }
+  x.shadowColor = "rgba(0,0,0,.9)"; x.shadowBlur = 6 * u; x.shadowOffsetY = 2 * u;
+  let y = bottom;
+  for (let i = st.chat.length - 1; i >= 0; i--){
+    const m = st.chat[i], L = layMsg(x, m, cw, u);
+    y -= L.h;
+    if (y < top - 40 * u) break;
+    x.globalAlpha = Math.min(1, Math.max(0, (y - (top - 40 * u)) / (140 * u))); // older lines fade out at the top
+    if (m.t === "ev"){
+      x.save(); x.shadowColor = "transparent";
+      x.fillStyle = "rgba(20,18,28,.75)"; x.beginPath(); x.roundRect(pad, y, cw, L.h, 10 * u); x.fill();
+      x.fillStyle = m.k === "raid" ? "#ffb547" : m.k === "gift" ? "#ff5fa8" : "#a873ff";
+      x.beginPath(); x.roundRect(pad, y, 7 * u, L.h, [10 * u, 0, 0, 10 * u]); x.fill();
+      x.restore();
+      drawLines(x, L.lead, pad + 26 * u, y + 16 * u, 48 * u, 37 * u, u);
+      drawLines(x, L.sub, pad + 26 * u, y + 16 * u + L.lead.length * 48 * u, 44 * u, 34 * u, u);
+    } else if (m.t === "sys") drawLines(x, L.lines, pad, y, 50 * u, 39 * u, u);
+    else {
+      if (m.s){ x.save(); x.shadowColor = "transparent"; x.fillStyle = "rgba(168,115,255,.28)"; x.beginPath(); x.roundRect(pad - 12 * u, y - 2 * u, cw + 24 * u, L.h + 4 * u, 8 * u); x.fill(); x.restore(); }
+      drawLines(x, L.lines, pad, y, 54 * u, 41 * u, u);
+    }
+    y -= 10 * u;
+  }
+  x.restore();
+}
+
+/* ---- recording status ---- */
+let recShown = "";
+function renderRec(){
+  $("recOn").checked = rec.on; $("recChat").checked = rec.chat;
+  let kind = "wait", text;
+  if (!recSupported){ kind = "bad"; text = "Recording the whole stream needs Chrome or Edge."; }
+  else if (!rec.on) text = "Off.";
+  else if (!st.dir || !st.ok) text = "Choose and allow a folder above first.";
+  else if (rec.err){ kind = "bad"; text = rec.err; }
+  else if (!rec.ac || rec.ac.state !== "running") text = "Click anywhere on this page so it can record (browsers need a click before they record sound).";
+  else if (rec.cur){
+    kind = "rec";
+    const s = rec.session, b = s.bytes;
+    text = `Recording · ${upClock(Date.now() - s.started)} · part ${s.part} · ${b < 1073741824 ? Math.round(b / 1048576) + " MB" : (b / 1073741824).toFixed(2) + " GB"}`;
+    if (performance.now() - rec.lastFrame > 1000) text += " · waiting for the picture";
+  }
+  else if (st.hs && !st.hs.on) text = "Waiting for the stream to go live.";
+  else if (!st.live) text = "Waiting for the phone's camera.";
+  else text = "Starting…";
+  if (rec.fixing) text += ` · finishing ${rec.fixing} part${rec.fixing > 1 ? "s" : ""}`;
+  $("recBadge").hidden = kind !== "rec";
+  if (kind + text === recShown) return;
+  recShown = kind + text;
+  $("recStatus").className = "status " + kind;
+  $("recText").textContent = text;
+}
+
 /* ---- screen ---- */
 function setStatus(kind, text){
   $("status").className = "status " + kind;
@@ -543,6 +917,7 @@ function renderCam(){
   $("camBox").hidden = !st.watch;
   $("camMsg").hidden = st.live;
   $("camMsg").textContent = "Waiting for your phone's camera. It shows while Chatline on your phone has its camera on.";
+  $("camVia").textContent = !st.live ? "" : viaMain(st.call) ? "· through the main phone" : "· straight from the camera phone";
   const t = $("soundToggle");
   t.hidden = !st.watch;
   t.innerHTML = (st.sound ? ICON_ON : ICON_OFF) + `<span>${st.sound ? "Sound on" : "Sound off"}</span>`;
@@ -555,6 +930,7 @@ function renderCam(){
 }
 function render(){
   renderCam();
+  renderRec();
   $("step1").classList.toggle("done", st.code.length >= 4);
   $("step2").classList.toggle("done", !!st.dir && st.ok);
   $("pick").hidden = !!st.dir;
@@ -588,10 +964,10 @@ function codeChanged(){
   if (c === st.code) return;
   st.code = c; st.noPhone = false;
   try { localStorage.setItem("chatlinePC.code", c); } catch {}
-  dropConn();
+  dropConn(true);
   if (c.length >= 6) connect(); else render();
 }
-codeIn.addEventListener("input", () => { if (normCode(codeIn.value).length >= 6) codeChanged(); else { st.code = normCode(codeIn.value); dropConn(); render(); } });
+codeIn.addEventListener("input", () => { if (normCode(codeIn.value).length >= 6) codeChanged(); else { st.code = normCode(codeIn.value); dropConn(true); render(); } });
 codeIn.addEventListener("change", codeChanged);
 codeIn.addEventListener("keydown", e => { if (e.key === "Enter") codeChanged(); });
 $("pick").addEventListener("click", pickFolder);
@@ -608,6 +984,19 @@ $("camToggle").addEventListener("click", () => {
   try { localStorage.setItem("chatlinePC.watch", st.watch ? "on" : "off"); } catch {}
   tell(); render();
 });
+$("recOn").addEventListener("change", e => {
+  rec.on = e.target.checked; rec.err = "";
+  try { localStorage.setItem("chatlinePC.rec", rec.on ? "on" : "off"); } catch {}
+  if (!rec.on) recEnd();
+  recAudio(); recSync(); tell(); renderRec();
+});
+$("recChat").addEventListener("change", e => {
+  rec.chat = e.target.checked;
+  try { localStorage.setItem("chatlinePC.recChat", rec.chat ? "on" : "off"); } catch {}
+});
+// the fonts the recording draws with
+if (document.fonts) ["700 40px Figtree", "600 36px Figtree", "italic 600 32px Figtree", "700 40px 'Barlow Condensed'", "600 34px 'Barlow Condensed'"].forEach(f => document.fonts.load(f).catch(() => {}));
+recAudio(); // works without a click if the browser already allows this page to play sound
 
 /* come back after sleep, lost internet or a phone restart */
 function wake(){
@@ -616,8 +1005,13 @@ function wake(){
   else if (st.peer.disconnected){ try { st.peer.reconnect(); } catch {} }
   else if (!st.conn && st.peer.open) openConn();
 }
-// check in with the phone so it knows this page is still here
-setInterval(() => { if (linked()){ try { st.conn.send({ t: "ping" }); } catch {} } }, 3000);
+// check in with the phone so it knows this page is still here. The phone checks in too: if it goes
+// quiet (battery, no signal) the link is dead even if the browser hasn't noticed, so connect again.
+setInterval(() => {
+  if (!linked()) return;
+  try { st.conn.send({ t: "ping" }); } catch {}
+  if (st.pinged && Date.now() - st.seen > QUIET_MS && st.conn.cl_lost) st.conn.cl_lost();
+}, 3000);
 window.addEventListener("online", wake);
 document.addEventListener("visibilitychange", () => { tell(); if (!document.hidden) wake(); });
 setInterval(wake, 15000);
